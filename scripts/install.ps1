@@ -57,3 +57,4 @@ Write-Host "==========================================================" -Foregro
 Write-Host "  ✓ Deskbird is running! Look for the bird on your screen. " -ForegroundColor Green
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host ""
+
