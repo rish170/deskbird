@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deskbird - Sprite & Art Inspector</title>
+    <style>
+      :root {
+        --color-ink: #1a1d24;
+        --color-panel-paper: #fbf3dc;
+        --color-page-paper: #efe5cf;
+        --color-flat-shadow: #cdbf9e;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+
+      body {
+        background-color: var(--color-page-paper);
+        color: var(--color-ink);
+        font-family: monospace;
+        padding: 24px;
+      }
+
+      h1 {
+        font-size: 20px;
+        margin-bottom: 6px;
+      }
+
+      p.sub {
+        font-size: 13px;
+        margin-bottom: 20px;
+        color: #444;
+      }
+
+      .error-box {
+        background: #fee2e2;
+        border: 2px solid #ef4444;
+        color: #991b1b;
+        padding: 12px;
+        margin-bottom: 16px;
+        display: none;
+      }
+
+      .section {
+        background-color: var(--color-panel-paper);
+        border: 2px solid var(--color-ink);
+        box-shadow: 4px 4px 0 var(--color-flat-shadow);
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+
+      .section h2 {
+        font-size: 14px;
+        margin-bottom: 14px;
+        border-bottom: 1px solid #d5c8ad;
+        padding-bottom: 6px;
+      }
+
+      .badge-default {
+        background: #10b981;
+        color: #fff;
+        font-size: 10px;
+        padding: 2px 6px;
+        border-radius: 3px;
+        vertical-align: middle;
+        margin-left: 6px;
+      }
+
+      /* Reference Showcase Grid */
+      .showcase-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        justify-content: flex-start;
+      }
+
+      .showcase-card {
+        background: #fbf3dc;
+        border: 2px solid var(--color-ink);
+        padding: 12px 16px;
+        text-align: center;
+        box-shadow: 3px 3px 0 var(--color-flat-shadow);
+      }
+
+      .showcase-card canvas {
+        display: block;
+        margin: 0 auto 10px auto;
+        border: 1px dashed rgba(26, 29, 36, 0.2);
+        background: #fbf3dc;
+      }
+
+      .showcase-card .title {
+        font-size: 11px;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+      }
+
+      .showcase-card .subtitle {
+        font-size: 9px;
+        color: #666;
+        margin-top: 3px;
+      }
+
+      .palette-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .swatch {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--color-ink);
+        padding: 6px 10px;
+        background: #fff;
+        min-width: 110px;
+      }
+
+      .swatch-color {
+        width: 22px;
+        height: 22px;
+        border: 1px solid var(--color-ink);
+      }
+
+      .loops-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+      }
+
+      .loop-card {
+        background: var(--color-page-paper);
+        border: 2px solid var(--color-ink);
+        padding: 12px;
+        text-align: center;
+        min-width: 120px;
+      }
+
+      .loop-card h3 {
+        font-size: 11px;
+        margin-bottom: 8px;
+      }
+
+      .frames-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+      }
+
+      .frame-card {
+        background: var(--color-page-paper);
+        border: 2px solid var(--color-ink);
+        padding: 8px;
+        text-align: center;
+      }
+
+      .frame-card .label {
+        font-size: 11px;
+        font-weight: bold;
+        margin-top: 6px;
+        display: block;
+        word-break: break-all;
+      }
+
+      .frame-card .dim {
+        font-size: 9px;
+        color: #666;
+        margin-top: 2px;
+        display: block;
+      }
+
+      canvas {
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>DESKBIRD - SPRITE & ART INSPECTOR</h1>
+    <p class="sub">Single source of truth: <code>art/bird.sprites.js</code> (Cute Blue & Pink Bee-Eater)</p>
+
+    <div id="error-box" class="error-box"></div>
+
+    <!-- 1. Compact 2x Scale (Reduced Default) -->
+    <div class="section">
+      <h2>1. Reduced Compact Poses (2x Scale = 64px Flying / 112px Perch) <span class="badge-default">ACTIVE DEFAULT</span></h2>
+      <div class="showcase-grid">
+        <div class="showcase-card">
+          <canvas id="showcase-perching-2x" width="112" height="100"></canvas>
+          <div class="title">PERCHING (facing front)</div>
+          <div class="subtitle">72x86 DIP on 112x16 DIP branch</div>
+        </div>
+        <div class="showcase-card">
+          <canvas id="showcase-fly-up-2x" width="84" height="100"></canvas>
+          <div class="title">FLYING (wings up)</div>
+          <div class="subtitle">64x64 DIP (2x cursor size)</div>
+        </div>
+        <div class="showcase-card">
+          <canvas id="showcase-fly-down-2x" width="84" height="100"></canvas>
+          <div class="title">FLYING (wings down)</div>
+          <div class="subtitle">64x64 DIP (2x cursor size)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Medium 3x Scale (Alternative) -->
+    <div class="section">
+      <h2>2. Medium Poses (3x Scale = 96px Flying / 168px Perch)</h2>
+      <div class="showcase-grid">
+        <div class="showcase-card">
+          <canvas id="showcase-perching-3x" width="168" height="140"></canvas>
+          <div class="title">PERCHING (facing front)</div>
+          <div class="subtitle">108x129 DIP on 168x24 DIP branch</div>
+        </div>
+        <div class="showcase-card">
+          <canvas id="showcase-fly-up-3x" width="120" height="140"></canvas>
+          <div class="title">FLYING (wings up)</div>
+          <div class="subtitle">96x96 DIP</div>
+        </div>
+        <div class="showcase-card">
+          <canvas id="showcase-fly-down-3x" width="120" height="140"></canvas>
+          <div class="title">FLYING (wings down)</div>
+          <div class="subtitle">96x96 DIP</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Colour Palette -->
+    <div class="section">
+      <h2>3. Colour Palette</h2>
+      <div id="palette-grid" class="palette-grid"></div>
+    </div>
+
+    <!-- 4. Animated Loops (2x Scale Compact) -->
+    <div class="section">
+      <h2>4. Animated Loops (2x Scale Compact)</h2>
+      <div class="loops-grid">
+        <div class="loop-card">
+          <h3>Flap Flight (10 fps)</h3>
+          <canvas id="loop-fly" width="64" height="64"></canvas>
+        </div>
+        <div class="loop-card">
+          <h3>Fast Flight (14 fps)</h3>
+          <canvas id="loop-fly-fast" width="64" height="64"></canvas>
+        </div>
+        <div class="loop-card">
+          <h3>Perched Front Idle & Blink</h3>
+          <canvas id="loop-perch-idle" width="112" height="100"></canvas>
+        </div>
+        <div class="loop-card">
+          <h3>Talking While Flying</h3>
+          <canvas id="loop-fly-talk" width="64" height="64"></canvas>
+        </div>
+        <div class="loop-card">
+          <h3>Talking While Perched</h3>
+          <canvas id="loop-perch-talk" width="112" height="100"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Perch Branch Bar -->
+    <div class="section">
+      <h2>5. Perch Branch Bar (56x8 Art Pixels)</h2>
+      <div style="margin-bottom: 12px;">
+        <span style="font-size: 11px; display: block; margin-bottom: 4px;">1x Scale (56x8 DIP):</span>
+        <canvas id="canvas-perch-1x" width="56" height="8" style="border: 1px dashed #1a1d24;"></canvas>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <span style="font-size: 11px; display: block; margin-bottom: 4px;">2x Scale (112x16 DIP) [Default]:</span>
+        <canvas id="canvas-perch-2x" width="112" height="16" style="border: 1px dashed #1a1d24;"></canvas>
+      </div>
+      <div>
+        <span style="font-size: 11px; display: block; margin-bottom: 4px;">3x Scale (168x24 DIP):</span>
+        <canvas id="canvas-perch-3x" width="168" height="24" style="border: 1px dashed #1a1d24;"></canvas>
+      </div>
+    </div>
+
+    <!-- 6. All Individual Frames -->
+    <div class="section">
+      <h2>6. Individual Frames (2x Scale)</h2>
+      <div id="frames-grid" class="frames-grid"></div>
+    </div>
+
+    <script type="module">
+      try {
+        const { FRAMES, PALETTE, COLOR_MAP, META, perchBar } = await import('./bird.sprites.js');
+
+        // Draw grid to a 2D canvas context at an integer scale and offset
+        function drawGrid(ctx, grid, offsetX = 0, offsetY = 0, scale = 1) {
+          if (!grid) return;
+          for (let r = 0; r < grid.length; r++) {
+            const row = grid[r];
+            for (let c = 0; c < row.length; c++) {
+              const char = row[c];
+              const hex = COLOR_MAP[char];
+              if (hex) {
+                ctx.fillStyle = hex;
+                ctx.fillRect(offsetX + c * scale, offsetY + r * scale, scale, scale);
+              }
+            }
+          }
+        }
+
+        // Draw the complete perch bar (with grass tufts)
+        function drawPerchBarAsset(ctx, offsetX = 0, offsetY = 0, scale = 2) {
+          const barGrid = perchBar(56);
+          const grass = [
+            [6, 1, PALETTE.G], [7, 0, PALETTE.G], [7, 1, PALETTE.L], [8, 1, PALETTE.G],
+            [47, 1, PALETTE.G], [48, 0, PALETTE.G], [48, 1, PALETTE.L], [49, 1, PALETTE.G]
+          ];
+          for (const [gx, gy, col] of grass) {
+            ctx.fillStyle = col;
+            ctx.fillRect(offsetX + gx * scale, offsetY + gy * scale, scale, scale);
+          }
+          // Wood bar starting at row 2:
+          drawGrid(ctx, barGrid, offsetX, offsetY + 2 * scale, scale);
+        }
+
+        // Draw complete composite perched bird (Tail behind -> Bar -> Body in front)
+        function drawCompositePerched(ctx, birdFrame = 'perchIdle', scale = 2, offsetX = 0, offsetY = 6) {
+          const perchX = offsetX;
+          const perchY = offsetY + 30 * scale;
+          const birdX = offsetX + 10 * scale;
+          const birdY = offsetY;
+
+          // 1. Perch Tail layer behind the wooden bar
+          drawGrid(ctx, FRAMES.perchTail, birdX, birdY, scale);
+
+          // 2. Perch Bar in the middle
+          drawPerchBarAsset(ctx, perchX, perchY, scale);
+
+          // 3. Perched bird body in front (toes grip over wood top)
+          drawGrid(ctx, FRAMES[birdFrame] || FRAMES.perchIdle, birdX, birdY, scale);
+        }
+
+        // 1. Render Palette Swatches
+        const paletteContainer = document.getElementById('palette-grid');
+        for (const [name, hex] of Object.entries(PALETTE)) {
+          const swatch = document.createElement('div');
+          swatch.className = 'swatch';
+          swatch.innerHTML = `
+            <div class="swatch-color" style="background-color: ${hex};"></div>
+            <div>
+              <div style="font-size: 11px; font-weight: bold;">${name}</div>
+              <div style="font-size: 10px; color: #555;">${hex}</div>
+            </div>
+          `;
+          paletteContainer.appendChild(swatch);
+        }
+
+        // 2. Render 2x Scale Showcase Panels
+        const cPerch2x = document.getElementById('showcase-perching-2x');
+        drawCompositePerched(cPerch2x.getContext('2d'), 'perchIdle', 2, 0, 6);
+
+        const cFlyUp2x = document.getElementById('showcase-fly-up-2x');
+        drawGrid(cFlyUp2x.getContext('2d'), FRAMES.flyUp, 10, 16, 2);
+
+        const cFlyDown2x = document.getElementById('showcase-fly-down-2x');
+        drawGrid(cFlyDown2x.getContext('2d'), FRAMES.flyDown, 10, 16, 2);
+
+        // 3. Render 3x Scale Showcase Panels
+        const cPerch3x = document.getElementById('showcase-perching-3x');
+        drawCompositePerched(cPerch3x.getContext('2d'), 'perchIdle', 3, 0, 8);
+
+        const cFlyUp3x = document.getElementById('showcase-fly-up-3x');
+        drawGrid(cFlyUp3x.getContext('2d'), FRAMES.flyUp, 12, 20, 3);
+
+        const cFlyDown3x = document.getElementById('showcase-fly-down-3x');
+        drawGrid(cFlyDown3x.getContext('2d'), FRAMES.flyDown, 12, 20, 3);
+
+        // 4. Render Animated Loops (at 2x scale)
+        function setupFlyLoop(canvasId, frameList, fps) {
+          const canvas = document.getElementById(canvasId);
+          const ctx = canvas.getContext('2d');
+          let currentFrame = 0;
+          setInterval(() => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const frameName = frameList[currentFrame % frameList.length];
+            drawGrid(ctx, FRAMES[frameName], 0, 0, 2);
+            currentFrame++;
+          }, 1000 / fps);
+        }
+
+        setupFlyLoop('loop-fly', META.flapLoop, 10);
+        setupFlyLoop('loop-fly-fast', META.flapLoop, 14);
+        setupFlyLoop('loop-fly-talk', ['flyUpTalk', 'flyMidTalk', 'flyDownTalk', 'flyMidTalk'], 10);
+
+        // Perched Idle with periodic blink
+        const cLoopPerch = document.getElementById('loop-perch-idle');
+        const ctxLoopPerch = cLoopPerch.getContext('2d');
+        let isBlink = false;
+        setInterval(() => {
+          ctxLoopPerch.clearRect(0, 0, cLoopPerch.width, cLoopPerch.height);
+          drawCompositePerched(ctxLoopPerch, isBlink ? 'perchBlink' : 'perchIdle', 2, 0, 6);
+        }, 100);
+
+        setInterval(() => {
+          isBlink = true;
+          setTimeout(() => { isBlink = false; }, 160);
+        }, 3500);
+
+        // Perched Talking loop
+        const cLoopTalk = document.getElementById('loop-perch-talk');
+        const ctxLoopTalk = cLoopTalk.getContext('2d');
+        let talkState = false;
+        setInterval(() => {
+          ctxLoopTalk.clearRect(0, 0, cLoopTalk.width, cLoopTalk.height);
+          drawCompositePerched(ctxLoopTalk, talkState ? 'perchTalk' : 'perchIdle', 2, 0, 6);
+          talkState = !talkState;
+        }, 150);
+
+        // 5. Render Perch Branch Bar
+        const c1 = document.getElementById('canvas-perch-1x');
+        drawPerchBarAsset(c1.getContext('2d'), 0, 0, 1);
+
+        const c2 = document.getElementById('canvas-perch-2x');
+        drawPerchBarAsset(c2.getContext('2d'), 0, 0, 2);
+
+        const c3 = document.getElementById('canvas-perch-3x');
+        drawPerchBarAsset(c3.getContext('2d'), 0, 0, 3);
+
+        // 6. Individual Frames at 2x Scale
+        const framesGrid = document.getElementById('frames-grid');
+        for (const [name, grid] of Object.entries(FRAMES)) {
+          const card = document.createElement('div');
+          card.className = 'frame-card';
+
+          const h = grid.length;
+          const w = grid[0].length;
+          const canvas = document.createElement('canvas');
+          canvas.width = w * 2;
+          canvas.height = h * 2;
+          drawGrid(canvas.getContext('2d'), grid, 0, 0, 2);
+
+          const label = document.createElement('span');
+          label.className = 'label';
+          label.textContent = name;
+
+          const dim = document.createElement('span');
+          dim.className = 'dim';
+          dim.textContent = `${w}x${h} px (${w*2}x${h*2} DIP)`;
+
+          card.appendChild(canvas);
+          card.appendChild(label);
+          card.appendChild(dim);
+          framesGrid.appendChild(card);
+        }
+      } catch (err) {
+        console.error('Inspector Error:', err);
+        const errBox = document.getElementById('error-box');
+        errBox.textContent = 'Failed to load sprites: ' + err.message;
+        errBox.style.display = 'block';
+      }
+    </script>
+  </body>
+</html>

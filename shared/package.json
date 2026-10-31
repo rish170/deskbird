@@ -1,0 +1,12 @@
+{
+  "name": "deskbird-shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared protocol, constants, and validators for Deskbird",
+  "main": "protocol.js",
+  "type": "module",
+  "exports": {
+    ".": "./protocol.js"
+  }
+}
+

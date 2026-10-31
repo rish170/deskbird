@@ -1,0 +1,28 @@
+appId: com.deskbird.app
+productName: Deskbird
+copyright: Copyright © 2026 rish170
+directories:
+  output: ../dist-electron
+  buildResources: build
+files:
+  - bin/**/*
+  - src/**/*
+  - package.json
+  - "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+  - "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}"
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: src/main/assets/tray-32.png
+nsis:
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Deskbird
+  artifactName: ${productName}-Setup-${version}.${ext}
+

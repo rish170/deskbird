@@ -1,0 +1,297 @@
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('assets/fonts/press-start-2p.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+:root {
+  --color-ink: #1a1d24;
+  --color-bubble-paper: #fbf3dc;
+  --color-bubble-shadow: #cdbf9e;
+  --color-mustard: #d9a21b;
+  --color-tomato: #c4452d;
+  --color-wood: #6e4a2e;
+  --font-retro: 'Press Start 2P', monospace;
+  --bird-scale: 2;
+  --perch-w: calc(56px * var(--bird-scale));
+  --perch-h: calc(8px * var(--bird-scale));
+  --fly-w: calc(32px * var(--bird-scale));
+  --fly-h: calc(32px * var(--bird-scale));
+  --perch-bird-w: calc(36px * var(--bird-scale));
+  --perch-bird-h: calc(43px * var(--bird-scale));
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-drag: none;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+html,
+body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Perch Bar (Top Right of Primary Display)
+   Positioned at top: 160px to ensure the perched bird head is completely
+   visible with generous clearance below the top of the monitor!
+   ========================================================================== */
+.perch-container {
+  position: absolute;
+  top: 160px;
+  right: 24px;
+  width: var(--perch-w);
+  height: var(--perch-h);
+  overflow: visible;
+  z-index: 10;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* Perch Tail Layer (Z-index 5: drawn BEHIND the wooden bar) */
+.perch-tail {
+  position: absolute;
+  left: calc(10px * var(--bird-scale));
+  top: calc(-30px * var(--bird-scale));
+  width: var(--perch-bird-w);
+  height: var(--perch-bird-h);
+  background-image: url('assets/bird-perch-tail.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Perch Wood Bar with Grass Tufts (Z-index 10) */
+.perch-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('assets/perch.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  z-index: 10;
+}
+
+/* ==========================================================================
+   The Bird Container & Spritesheets (Z-index 20: drawn in FRONT of the bar)
+   ========================================================================== */
+.bird-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.bird-container.mode-flying {
+  width: var(--fly-w);
+  height: var(--fly-h);
+}
+
+.bird-container.mode-perched {
+  width: var(--perch-bird-w);
+  height: var(--perch-bird-h);
+}
+
+.bird-container.perched-clickable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.bird-sprite {
+  transform-origin: center center;
+  transition: transform 0.05s ease-out;
+}
+
+/* Mode Flying */
+.bird-container.mode-flying .bird-sprite {
+  width: var(--fly-w);
+  height: var(--fly-h);
+  background-image: url('assets/bird-fly.png');
+  background-repeat: no-repeat;
+  background-size: calc(192px * var(--bird-scale)) calc(32px * var(--bird-scale));
+}
+
+/* Mode Perched */
+.bird-container.mode-perched .bird-sprite {
+  width: var(--perch-bird-w);
+  height: var(--perch-bird-h);
+  background-image: url('assets/bird-perched.png');
+  background-repeat: no-repeat;
+  background-size: calc(108px * var(--bird-scale)) calc(43px * var(--bird-scale));
+}
+
+/* Facing Left */
+.bird-sprite.facing-left {
+  transform: scaleX(-1);
+}
+
+/* Flying Spritesheet Frame Offsets (32x32 art pixels per frame) */
+.frame-flyUp { background-position: 0 0; }
+.frame-flyMid { background-position: calc(-32px * var(--bird-scale)) 0; }
+.frame-flyDown { background-position: calc(-64px * var(--bird-scale)) 0; }
+.frame-flyUpTalk { background-position: calc(-96px * var(--bird-scale)) 0; }
+.frame-flyMidTalk { background-position: calc(-128px * var(--bird-scale)) 0; }
+.frame-flyDownTalk { background-position: calc(-160px * var(--bird-scale)) 0; }
+
+/* Perched Spritesheet Frame Offsets (36x43 art pixels per frame) */
+.frame-perchIdle { background-position: 0 0; }
+.frame-perchBlink { background-position: calc(-36px * var(--bird-scale)) 0; }
+.frame-perchTalk { background-position: calc(-72px * var(--bird-scale)) 0; }
+
+/* ==========================================================================
+   Tooltips
+   ========================================================================== */
+.pixel-tooltip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background-color: var(--color-bubble-paper);
+  border: 2px solid var(--color-ink);
+  color: var(--color-ink);
+  font-family: var(--font-retro);
+  font-size: 8px;
+  padding: 3px 6px;
+  white-space: nowrap;
+  box-shadow: 2px 2px 0 var(--color-bubble-shadow);
+  display: none;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.perch-container:hover .pixel-tooltip,
+.bird-container.perched-clickable:hover .pixel-tooltip {
+  display: block;
+}
+
+/* ==========================================================================
+   8-Bit Speech Bubble
+   ========================================================================== */
+.speech-bubble {
+  position: absolute;
+  z-index: 30;
+  pointer-events: auto;
+  cursor: pointer;
+  max-width: 240px;
+  min-width: 140px;
+  will-change: transform;
+}
+
+.bubble-box {
+  background-color: var(--color-bubble-paper);
+  border: 2px solid var(--color-ink);
+  box-shadow: 4px 4px 0 var(--color-bubble-shadow);
+  padding: 8px 10px;
+  position: relative;
+}
+
+.bubble-sender {
+  font-family: var(--font-retro);
+  font-size: 8px;
+  color: var(--color-tomato);
+  margin-bottom: 6px;
+  border-bottom: 1px dotted var(--color-bubble-shadow);
+  padding-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bubble-text {
+  font-family: var(--font-retro);
+  font-size: 8px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  word-break: break-word;
+  white-space: pre-wrap;
+  min-height: 16px;
+  max-height: 64px;
+  overflow: hidden;
+}
+
+.bubble-queue-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-retro);
+  font-size: 7px;
+  color: var(--color-mustard);
+}
+
+.queue-triangle {
+  display: inline-block;
+  animation: triangleBlink 0.6s steps(2, start) infinite;
+}
+
+@keyframes triangleBlink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Stepped Pixel Tail pointing to the bird */
+.bubble-tail {
+  position: absolute;
+  width: 10px;
+  height: 8px;
+  background-color: var(--color-bubble-paper);
+  border-right: 2px solid var(--color-ink);
+  border-bottom: 2px solid var(--color-ink);
+  bottom: -6px;
+  left: 20px;
+  transform: rotate(45deg);
+}
+
+.tail-flip .bubble-tail {
+  left: auto;
+  right: 20px;
+  border-right: none;
+  border-left: 2px solid var(--color-ink);
+}
+
+/* When speech bubble is on the LEFT of the perched bird, tail points RIGHT */
+.tail-right .bubble-tail {
+  bottom: auto;
+  top: 16px;
+  left: auto;
+  right: -5px;
+  width: 8px;
+  height: 8px;
+  border-left: none;
+  border-bottom: none;
+  border-right: 2px solid var(--color-ink);
+  border-top: 2px solid var(--color-ink);
+  transform: rotate(45deg);
+}
+
+/* ==========================================================================
+   Debug Outline Visualization (Hidden by default to prevent red outlines)
+   ========================================================================== */
+.debug-overlay {
+  display: none !important;
+}
+
+.debug-box {
+  display: none !important;
+}
+
+.hidden {
+  display: none !important;
+}

@@ -1,0 +1,51 @@
+{
+  "name": "deskbird",
+  "version": "1.0.0",
+  "description": "Desktop pixel bird companion that follows your mouse and receives 8-bit speech messages",
+  "bin": {
+    "deskbird": "bin/deskbird.js"
+  },
+  "main": "src/main/index.cjs",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rish170/deskbird.git"
+  },
+  "keywords": [
+    "deskbird",
+    "electron",
+    "pixel-art",
+    "desktop-pet",
+    "overlay",
+    "companion"
+  ],
+  "author": "rish170",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rish170/deskbird/issues"
+  },
+  "homepage": "https://github.com/rish170/deskbird#readme",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "os": [
+    "win32",
+    "darwin",
+    "linux"
+  ],
+  "files": [
+    "bin",
+    "src",
+    "electron-builder.yml"
+  ],
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --local",
+    "demo": "electron . --demo"
+  },
+  "dependencies": {
+    "electron": "45.2.1",
+    "socket.io-client": "4.8.4"
+  }
+}
+

@@ -1,0 +1,36 @@
+{
+  "name": "deskbird-workspace",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "bird",
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev:all": "node scripts/dev-all.js",
+    "dev:bird": "npm run dev -w bird",
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "demo": "npm run demo -w bird",
+    "sprites:preview": "node scripts/preview-sprites.js",
+    "sprites:export": "node art/export-sprites.js",
+    "build": "npm run build -w web",
+    "start:prod-local": "node scripts/start-prod-local.js",
+    "test": "vitest run",
+    "test:install": "node scripts/test-install.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "concurrently": "10.0.6",
+    "cross-env": "10.1.0",
+    "eslint": "10.14.0",
+    "pngjs": "7.0.0",
+    "prettier": "3.9.10",
+    "vitest": "5.0.5"
+  }
+}

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Send 8-bit pixel messages to your friend's desktop bird companion in real-time." />
+    <meta name="theme-color" content="#efe5cf" />
+    <meta property="og:title" content="Deskbird - Desktop Pixel Bird" />
+    <meta property="og:description" content="Send 8-bit pixel messages to your friend's desktop bird companion in real-time." />
+    <meta property="og:image" content="/bird.png" />
+    <meta name="twitter:card" content="summary" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>Deskbird - Send a Message to a Desktop Bird</title>
+  </head>
+  <body>
+    <div class="page-container">
+      <main class="card-panel">
+        <header class="app-header">
+          <img src="/bird.png" alt="Pixel bird mascot" class="bird-header-img" width="72" height="72" />
+          <h1 class="app-title">DESKBIRD</h1>
+          <p class="app-tagline">Send an 8-bit note to your friend's screen</p>
+        </header>
+
+        <!-- Room Header & Switcher -->
+        <section class="room-section" aria-labelledby="room-label">
+          <div id="room-active-container" class="room-active-container hidden">
+            <span id="room-label" class="sub-label">CONNECTED ROOM:</span>
+            <div class="room-code-badge">
+              <span id="room-code-display" class="room-code-text">----</span>
+              <button id="change-room-btn" type="button" class="btn-small" title="Change bird code">change</button>
+            </div>
+          </div>
+
+          <form id="room-input-form" class="room-input-form hidden" autocomplete="off">
+            <label for="room-code-input" class="sub-label">ENTER YOUR FRIEND'S BIRD CODE:</label>
+            <div class="room-input-row">
+              <input
+                id="room-code-input"
+                type="text"
+                class="pixel-input room-code-input"
+                placeholder="e.g. ABCD-2345"
+                maxlength="9"
+                spellcheck="false"
+                autocomplete="off"
+                required
+              />
+              <button type="submit" class="btn-primary btn-join">CONNECT</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Server & Bird Status Pill -->
+        <div class="status-container">
+          <div id="status-pill" class="status-pill status-waking" role="status" aria-live="polite">
+            <span class="status-indicator"></span>
+            <span id="status-text">waking the server...</span>
+          </div>
+        </div>
+
+        <!-- Message Compose Form -->
+        <form id="message-form" class="message-form" autocomplete="off">
+          <div class="form-row">
+            <label for="sender-name-input" class="sub-label">YOUR NAME (OPTIONAL):</label>
+            <input
+              id="sender-name-input"
+              type="text"
+              class="pixel-input sender-name-input"
+              placeholder="Alex"
+              maxlength="12"
+              spellcheck="false"
+            />
+          </div>
+
+          <div class="form-row">
+            <div class="label-with-counter">
+              <label for="message-text-input" class="sub-label">MESSAGE:</label>
+              <span id="char-counter" class="char-counter">0 / 120</span>
+            </div>
+            <textarea
+              id="message-text-input"
+              class="pixel-textarea"
+              rows="3"
+              maxlength="120"
+              placeholder="Type a friendly message..."
+              required
+            ></textarea>
+            <div class="input-hint">Enter sends, Shift+Enter makes a new line</div>
+          </div>
+
+          <div id="form-error-alert" class="error-alert hidden" role="alert"></div>
+
+          <button id="send-button" type="submit" class="btn-send">
+            SEND MESSAGE
+          </button>
+        </form>
+
+        <!-- Message History Log -->
+        <section class="messages-section" aria-labelledby="history-label">
+          <h2 id="history-label" class="sub-label">SENT MESSAGES:</h2>
+          <div id="message-log" class="message-log" role="log" aria-live="polite">
+            <div class="empty-log-hint">No messages sent yet. Say hello!</div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+

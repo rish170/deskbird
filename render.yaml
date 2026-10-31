@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: deskbird-server
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node src/index.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ALLOWED_ORIGINS
+        value: https://deskbird.vercel.app,http://localhost:5173
+      - key: MAX_QUEUE
+        value: 20
+      - key: MESSAGE_TTL_MS
+        value: 86400000
+      - key: HEARTBEAT_EXPECTED_MS
+        value: 240000
+

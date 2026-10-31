@@ -1,0 +1,25 @@
+{
+  "name": "deskbird-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stateless real-time message relay server for Deskbird",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cors": "2.8.6",
+    "deskbird-shared": "*",
+    "dotenv": "18.0.9",
+    "express": "5.3.0",
+    "helmet": "8.3.0",
+    "socket.io": "4.8.4"
+  },
+  "devDependencies": {
+    "socket.io-client": "4.8.4"
+  }
+}
+

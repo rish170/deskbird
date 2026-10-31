@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deskbird Overlay</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- Perch Bar (only visible on primary display) -->
+    <div id="perch-container" class="perch-container hidden">
+      <!-- Tail layer sits behind the wooden branch -->
+      <div id="perch-tail" class="perch-tail"></div>
+      <div id="perch-bar" class="perch-bar"></div>
+      <div id="perch-tooltip" class="pixel-tooltip">click to perch</div>
+    </div>
+
+    <!-- Speech Bubble Dialog -->
+    <div id="speech-bubble" class="speech-bubble hidden">
+      <div class="bubble-box">
+        <div id="bubble-sender" class="bubble-sender hidden"></div>
+        <div id="bubble-text" class="bubble-text"></div>
+        <div id="bubble-queue-badge" class="bubble-queue-badge hidden">
+          <span class="queue-triangle">▶</span>
+          <span id="queue-count">+1</span>
+        </div>
+      </div>
+      <div class="bubble-tail"></div>
+    </div>
+
+    <!-- The Bird -->
+    <div id="bird-container" class="bird-container mode-perched perched-clickable">
+      <div id="bird-sprite" class="bird-sprite frame-perchIdle"></div>
+      <div id="bird-tooltip" class="pixel-tooltip">click to fly</div>
+    </div>
+
+    <!-- Debug Hit Box Visualizers (only active when --debug-mode is passed) -->
+    <div id="debug-overlay" class="debug-overlay hidden"></div>
+
+    <script type="module" src="renderer.js"></script>
+  </body>
+</html>
