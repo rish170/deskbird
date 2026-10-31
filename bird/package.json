@@ -1,6 +1,6 @@
 {
   "name": "deskbird",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Desktop pixel bird companion that follows your mouse and receives 8-bit speech messages",
   "bin": {
     "deskbird": "bin/deskbird.js"

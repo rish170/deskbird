@@ -23,6 +23,8 @@ const bubbleText = document.getElementById('bubble-text');
 const bubbleQueueBadge = document.getElementById('bubble-queue-badge');
 const queueCountEl = document.getElementById('queue-count');
 const debugOverlay = document.getElementById('debug-overlay');
+const perchTooltip = document.getElementById('perch-tooltip');
+const birdTooltip = document.getElementById('bird-tooltip');
 
 // Application Configuration and State
 let isPrimary = false;
@@ -35,8 +37,8 @@ let birdScale = 2;
 // Sprite dimensions based on scale
 let flyW = 32 * birdScale;
 let flyH = 32 * birdScale;
-let perchBirdW = 36 * birdScale;
-let perchBirdH = 43 * birdScale;
+let _perchBirdW = 36 * birdScale;
+let _perchBirdH = 43 * birdScale;
 let perchW = 56 * birdScale;
 let perchH = 8 * birdScale;
 
@@ -77,8 +79,8 @@ const flightDuration = 0.8; // seconds
 function recalculateDimensions() {
   flyW = 32 * birdScale;
   flyH = 32 * birdScale;
-  perchBirdW = 36 * birdScale;
-  perchBirdH = 43 * birdScale;
+  _perchBirdW = 36 * birdScale;
+  _perchBirdH = 43 * birdScale;
   perchW = 56 * birdScale;
   perchH = 8 * birdScale;
 
@@ -315,25 +317,32 @@ function applyPerchedMode(isPerched) {
       birdContainer.style.display = 'block';
       birdContainer.classList.add('mode-perched');
       birdContainer.classList.remove('mode-flying');
+      birdContainer.classList.add('bird-clickable');
       birdContainer.classList.add('perched-clickable');
       perchTail.classList.remove('hidden');
       birdX = perchBirdPos.x;
       birdY = perchBirdPos.y;
       currentFacing = 'right';
+      if (birdTooltip) birdTooltip.textContent = 'click to fly';
+      if (perchTooltip) perchTooltip.textContent = 'click to fly';
     } else {
       // Secondary display: NEVER show bird when perched!
       birdContainer.style.display = 'none';
       birdContainer.classList.remove('mode-flying');
       birdContainer.classList.add('mode-perched');
+      birdContainer.classList.remove('bird-clickable');
       birdContainer.classList.remove('perched-clickable');
       perchTail.classList.add('hidden');
     }
   } else {
     // Release from perch back to following
     birdContainer.classList.remove('mode-perched');
-    birdContainer.classList.remove('perched-clickable');
     birdContainer.classList.add('mode-flying');
+    birdContainer.classList.add('bird-clickable');
+    birdContainer.classList.remove('perched-clickable');
     perchTail.classList.add('hidden');
+    if (birdTooltip) birdTooltip.textContent = 'click to perch';
+    if (perchTooltip) perchTooltip.textContent = 'click to perch';
     if (stateMachine.state === BIRD_STATES.PERCHED_IDLE) {
       stateMachine.transitionTo(BIRD_STATES.FOLLOWING);
     }
@@ -360,7 +369,11 @@ function startFlyingToPerch() {
   flightProgress = 0;
   stateMachine.transitionTo(BIRD_STATES.FLYING_TO_PERCH);
 
+  birdContainer.classList.remove('bird-clickable');
   birdContainer.classList.remove('perched-clickable');
+  if (birdTooltip) birdTooltip.textContent = 'click to fly';
+  if (perchTooltip) perchTooltip.textContent = 'click to fly';
+
   if (window.deskbirdApi) {
     window.deskbirdApi.updateSetting('isPerched', true);
   }
@@ -370,7 +383,9 @@ function startTakeoff() {
   if (stateMachine.state !== BIRD_STATES.PERCHED_IDLE) return;
 
   stateMachine.transitionTo(BIRD_STATES.TAKEOFF);
-  birdContainer.classList.remove('perched-clickable');
+  birdContainer.classList.add('bird-clickable');
+  if (birdTooltip) birdTooltip.textContent = 'click to perch';
+  if (perchTooltip) perchTooltip.textContent = 'click to perch';
 
   if (window.deskbirdApi) {
     window.deskbirdApi.updateSetting('isPerched', false);
@@ -380,58 +395,99 @@ function startTakeoff() {
 // ----------------------------------------------------------------------------
 // Click & Hit Region Handlers
 // ----------------------------------------------------------------------------
+let lastToggleTime = 0;
+function handlePerchToggle(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const now = Date.now();
+  if (now - lastToggleTime < 350) return; // Debounce rapid multi-events
+  lastToggleTime = now;
+
+  console.log('[Deskbird] Click/Pointer event triggered. Current state:', stateMachine.state);
+  if (stateMachine.state === BIRD_STATES.PERCHED_IDLE) {
+    startTakeoff();
+  } else if (stateMachine.state === BIRD_STATES.FOLLOWING) {
+    startFlyingToPerch();
+  }
+}
+
 function setupHitListeners() {
-  // Click perch bar -> fly to perch
-  perchContainer.addEventListener('click', () => {
-    if (stateMachine.state === BIRD_STATES.FOLLOWING) {
-      startFlyingToPerch();
-    }
+  // Listen on pointerdown, mousedown, and click to ensure events register on all Windows environments
+  const triggerEvents = ['pointerdown', 'mousedown', 'click'];
+
+  triggerEvents.forEach((evt) => {
+    perchContainer.addEventListener(evt, handlePerchToggle);
+    birdContainer.addEventListener(evt, handlePerchToggle);
   });
 
-  // Click perched bird -> takeoff
-  birdContainer.addEventListener('click', () => {
-    if (stateMachine.state === BIRD_STATES.PERCHED_IDLE) {
-      startTakeoff();
+  // Direct DOM hover listeners to immediately inform main process of interactivity
+  const setHover = (interactive) => {
+    if (window.deskbirdApi) {
+      window.deskbirdApi.setInteractive(interactive);
     }
+  };
+
+  [perchContainer, birdContainer, speechBubble].forEach((el) => {
+    if (!el) return;
+    el.addEventListener('pointerenter', () => setHover(true));
+    el.addEventListener('mouseenter', () => setHover(true));
+    el.addEventListener('pointerleave', () => checkHitRegions(lastCursor));
+    el.addEventListener('mouseleave', () => checkHitRegions(lastCursor));
   });
 
   // Click bubble -> dismiss immediately
-  speechBubble.addEventListener('click', () => {
-    dismissCurrentMessage();
+  triggerEvents.forEach((evt) => {
+    speechBubble.addEventListener(evt, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismissCurrentMessage();
+    });
   });
 }
 
 function checkHitRegions(cursor) {
   hitBoxes = [];
 
-  // 1. Perch bar (primary display only, and when bird is not perched)
-  if (isPrimary && stateMachine.state === BIRD_STATES.FOLLOWING) {
-    hitBoxes.push({
-      rect: perchRect,
-      type: 'perch'
-    });
+  // 1. Perch bar (primary display)
+  if (isPrimary && perchContainer && !perchContainer.classList.contains('hidden')) {
+    const pRect = perchContainer.getBoundingClientRect();
+    if (pRect.width > 0 && pRect.height > 0) {
+      hitBoxes.push({
+        rect: { x: pRect.left, y: pRect.top, width: pRect.width, height: pRect.height },
+        type: 'perch'
+      });
+    }
   }
 
-  // 2. Perched bird (when sitting on perch on primary display)
-  const isPerched = isPrimary && stateMachine.state === BIRD_STATES.PERCHED_IDLE;
-  if (isPerched) {
-    hitBoxes.push({
-      rect: { x: birdX, y: birdY, width: perchBirdW, height: perchBirdH },
-      type: 'perched_bird'
-    });
+  // 2. Bird (both when perched and when following/flying)
+  const isFollowing = stateMachine.state === BIRD_STATES.FOLLOWING;
+  const birdVisible = isPrimary ? true : (cursorActive && isFollowing);
+
+  if (birdVisible && birdContainer && birdContainer.style.display !== 'none') {
+    const bRect = birdContainer.getBoundingClientRect();
+    if (bRect.width > 0 && bRect.height > 0) {
+      hitBoxes.push({
+        rect: { x: bRect.left, y: bRect.top, width: bRect.width, height: bRect.height },
+        type: 'bird'
+      });
+    }
   }
 
   // 3. Speech bubble (when visible)
-  if (currentMessage && !speechBubble.classList.contains('hidden')) {
-    const bRect = speechBubble.getBoundingClientRect();
-    hitBoxes.push({
-      rect: { x: bRect.left, y: bRect.top, width: bRect.width, height: bRect.height },
-      type: 'bubble'
-    });
+  if (currentMessage && speechBubble && !speechBubble.classList.contains('hidden')) {
+    const sRect = speechBubble.getBoundingClientRect();
+    if (sRect.width > 0 && sRect.height > 0) {
+      hitBoxes.push({
+        rect: { x: sRect.left, y: sRect.top, width: sRect.width, height: sRect.height },
+        type: 'bubble'
+      });
+    }
   }
 
-  // Evaluate if cursor point falls into any active region
-  const isInteractive = hitBoxes.some((box) => isPointInRect(cursor, box.rect, 4));
+  // Evaluate if cursor point falls into any active region with generous 14px padding
+  const isInteractive = hitBoxes.some((box) => isPointInRect(cursor, box.rect, 14));
 
   if (isInteractive !== lastInteractive) {
     lastInteractive = isInteractive;
@@ -440,7 +496,7 @@ function checkHitRegions(cursor) {
     }
   }
 
-  // No red debug outlines rendered to keep the desktop visual clean
+  // No red debug outlines rendered to keep desktop clean
   debugOverlay.innerHTML = '';
 }
 
@@ -459,9 +515,12 @@ function animationTick(now) {
 
   if (currentState === BIRD_STATES.FOLLOWING) {
     birdContainer.classList.add('mode-flying');
+    birdContainer.classList.add('bird-clickable');
     birdContainer.classList.remove('mode-perched');
     birdContainer.classList.remove('perched-clickable');
     perchTail.classList.add('hidden');
+    if (birdTooltip && birdTooltip.textContent !== 'click to perch') birdTooltip.textContent = 'click to perch';
+    if (perchTooltip && perchTooltip.textContent !== 'click to perch') perchTooltip.textContent = 'click to perch';
 
     if (cursorActive) {
       birdContainer.style.display = 'block';
@@ -647,6 +706,7 @@ if (window.deskbirdApi) {
         cursorActive = Boolean(data.active);
         if (data.active) {
           lastCursor = { x: data.x, y: data.y };
+          checkHitRegions(lastCursor);
         }
         if (currentMessage) {
           speechBubble.classList.remove('hidden');
@@ -665,6 +725,7 @@ if (window.deskbirdApi) {
     if (data.active) {
       cursorActive = true;
       lastCursor = { x: data.x, y: data.y };
+      checkHitRegions(lastCursor);
 
       // Snap to cursor vicinity immediately on initial frame
       if (!hasReceivedFirstCursor && stateMachine.state === BIRD_STATES.FOLLOWING) {

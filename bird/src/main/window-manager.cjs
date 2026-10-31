@@ -23,8 +23,11 @@ class WindowManager {
       const win = BrowserWindow.fromWebContents(event.sender);
       if (!win || win.isDestroyed()) return;
       const interactive = Boolean(payload && payload.interactive);
-      // If interactive is true, ignoreMouseEvents is false (allow clicks)
-      win.setIgnoreMouseEvents(!interactive, { forward: true });
+      if (interactive) {
+        win.setIgnoreMouseEvents(false);
+      } else {
+        win.setIgnoreMouseEvents(true, { forward: true });
+      }
     });
 
     // 2. Message seen receipt from renderer
@@ -48,9 +51,13 @@ class WindowManager {
   }
 
   initScreenEvents() {
+    let debounceTimer = null;
     const handleDisplayChange = () => {
-      console.log('[WindowManager] Displays changed. Rebuilding overlay windows...');
-      this.rebuildWindows();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        console.log('[WindowManager] Displays changed (debounced). Rebuilding overlay windows...');
+        this.rebuildWindows();
+      }, 300);
     };
 
     screen.on('display-added', handleDisplayChange);
@@ -84,7 +91,7 @@ class WindowManager {
         movable: false,
         hasShadow: false,
         skipTaskbar: true,
-        focusable: false,
+        focusable: true,
         show: false,
         alwaysOnTop: true,
         webPreferences: {
@@ -161,59 +168,71 @@ class WindowManager {
 
     // Poll cursor position at ~60 Hz (16ms)
     this.cursorPollInterval = setInterval(() => {
-      if (this.isPaused || this.windows.size === 0) return;
+      try {
+        if (this.isPaused || this.windows.size === 0) return;
 
-      const cursorPoint = screen.getCursorScreenPoint();
-      const primaryDisplay = screen.getPrimaryDisplay();
-      const activeDisplay = screen.getDisplayNearestPoint(cursorPoint);
+        const cursorPoint = screen.getCursorScreenPoint();
+        const primaryDisplay = screen.getPrimaryDisplay();
+        if (!primaryDisplay || !primaryDisplay.bounds) return;
 
-      this.windows.forEach((win, displayId) => {
-        if (!win || win.isDestroyed()) return;
-        const isPrimary = displayId === primaryDisplay.id;
-
-        if (this.isPerched) {
-          // When perched, bird sits ONLY on the primary display.
-          // Secondary displays NEVER have an active or visible bird.
-          if (isPrimary) {
-            const relX = cursorPoint.x - primaryDisplay.bounds.x;
-            const relY = cursorPoint.y - primaryDisplay.bounds.y;
-            const cursorOnPrimary = displayId === activeDisplay.id;
-            win.webContents.send('bird:cursor', {
-              x: relX,
-              y: relY,
-              isPrimary: true,
-              active: cursorOnPrimary,
-              isPerched: true
-            });
-          } else {
-            win.webContents.send('bird:cursor', {
-              active: false,
-              isPrimary: false,
-              isPerched: true
-            });
-          }
-        } else {
-          // Normal follow mode:
-          if (displayId === activeDisplay.id) {
-            const relX = cursorPoint.x - activeDisplay.bounds.x;
-            const relY = cursorPoint.y - activeDisplay.bounds.y;
-
-            win.webContents.send('bird:cursor', {
-              x: relX,
-              y: relY,
-              isPrimary,
-              active: true,
-              isPerched: false
-            });
-          } else {
-            win.webContents.send('bird:cursor', {
-              active: false,
-              isPrimary,
-              isPerched: false
-            });
-          }
+        let activeDisplay;
+        try {
+          activeDisplay = screen.getDisplayNearestPoint(cursorPoint);
+        } catch {
+          activeDisplay = primaryDisplay;
         }
-      });
+        if (!activeDisplay) activeDisplay = primaryDisplay;
+
+        this.windows.forEach((win, displayId) => {
+          if (!win || win.isDestroyed()) return;
+          const isPrimary = displayId === primaryDisplay.id;
+
+          if (this.isPerched) {
+            // When perched, bird sits ONLY on the primary display.
+            // Secondary displays NEVER have an active or visible bird.
+            if (isPrimary) {
+              const relX = cursorPoint.x - primaryDisplay.bounds.x;
+              const relY = cursorPoint.y - primaryDisplay.bounds.y;
+              const cursorOnPrimary = displayId === activeDisplay.id;
+              win.webContents.send('bird:cursor', {
+                x: relX,
+                y: relY,
+                isPrimary: true,
+                active: cursorOnPrimary,
+                isPerched: true
+              });
+            } else {
+              win.webContents.send('bird:cursor', {
+                active: false,
+                isPrimary: false,
+                isPerched: true
+              });
+            }
+          } else {
+            // Normal follow mode:
+            if (displayId === activeDisplay.id) {
+              const relX = cursorPoint.x - activeDisplay.bounds.x;
+              const relY = cursorPoint.y - activeDisplay.bounds.y;
+
+              win.webContents.send('bird:cursor', {
+                x: relX,
+                y: relY,
+                isPrimary,
+                active: true,
+                isPerched: false
+              });
+            } else {
+              win.webContents.send('bird:cursor', {
+                active: false,
+                isPrimary,
+                isPerched: false
+              });
+            }
+          }
+        });
+      } catch {
+        // Silently tolerate transient display queries during OS screen sleep/wake
+      }
     }, 16);
   }
 

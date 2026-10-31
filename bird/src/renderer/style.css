@@ -107,6 +107,7 @@ body {
   height: var(--perch-bird-h);
 }
 
+.bird-container.bird-clickable,
 .bird-container.perched-clickable {
   pointer-events: auto;
   cursor: pointer;
@@ -175,6 +176,7 @@ body {
 }
 
 .perch-container:hover .pixel-tooltip,
+.bird-container.bird-clickable:hover .pixel-tooltip,
 .bird-container.perched-clickable:hover .pixel-tooltip {
   display: block;
 }
