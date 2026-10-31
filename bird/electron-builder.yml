@@ -15,7 +15,7 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: src/main/assets/tray-32.png
+  icon: src/main/assets/icon.ico
 nsis:
   oneClick: true
   perMachine: false

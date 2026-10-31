@@ -13,5 +13,6 @@ contextBridge.exposeInMainWorld('deskbirdApi', {
   // Renderer -> Main Dispatches
   setInteractive: (interactive) => ipcRenderer.send('overlay:interactive', { interactive }),
   notifySeen: (id) => ipcRenderer.send('bird:message-seen', { id }),
-  updateSetting: (key, value) => ipcRenderer.send('bird:update-setting', { key, value })
+  updateSetting: (key, value) => ipcRenderer.send('bird:update-setting', { key, value }),
+  saveSetup: (opts) => ipcRenderer.send('bird:setup-complete', opts)
 });

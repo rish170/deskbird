@@ -1,11 +1,16 @@
 const fs = require('fs');
 const path = require('path');
-const { app } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { ConfigManager } = require('./config.cjs');
 const { WindowManager } = require('./window-manager.cjs');
 const { TrayManager } = require('./tray.cjs');
 const { BirdSocketClient } = require('./socket.cjs');
 const { formatRoomId } = require('./protocol.cjs');
+const {
+  createStartMenuShortcut,
+  createDesktopShortcut,
+  createQuickLaunchShortcut
+} = require('./shortcuts.cjs');
 
 // Parse command line arguments
 function parseArgs() {
@@ -78,8 +83,82 @@ if (!gotTheLock) {
   let windowManager;
   let trayManager;
   let socketClient;
+  let setupWindow = null;
 
   const cliFlags = parseArgs();
+
+  function showSetupDialog() {
+    if (setupWindow && !setupWindow.isDestroyed()) {
+      setupWindow.focus();
+      return;
+    }
+
+    setupWindow = new BrowserWindow({
+      width: 360,
+      height: 330,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      alwaysOnTop: true,
+      center: true,
+      frame: true,
+      title: 'Deskbird Setup',
+      icon: path.join(__dirname, 'assets', 'icon.ico'),
+      webPreferences: {
+        preload: path.join(__dirname, '..', 'preload', 'preload.cjs'),
+        contextIsolation: true,
+        nodeIntegration: false
+      }
+    });
+
+    setupWindow.setMenuBarVisibility(false);
+    setupWindow.loadFile(path.join(__dirname, '..', 'renderer', 'setup.html'));
+
+    setupWindow.on('closed', () => {
+      setupWindow = null;
+    });
+  }
+
+  // Handle shortcut options submitted from setup dialog
+  ipcMain.on('bird:setup-complete', (_event, payload) => {
+    console.log('[Deskbird] Setup options chosen:', payload);
+
+    if (payload?.desktopShortcut) {
+      createDesktopShortcut();
+    }
+
+    if (payload?.taskbarShortcut) {
+      createQuickLaunchShortcut();
+      const startLnk = createStartMenuShortcut();
+      if (startLnk && shell.showItemInFolder) {
+        shell.showItemInFolder(startLnk);
+      }
+    }
+
+    if (payload?.startOnBoot) {
+      try {
+        app.setLoginItemSettings({
+          openAtLogin: true,
+          path: process.execPath,
+          args: app.isPackaged ? [] : [app.getAppPath()]
+        });
+        if (configManager) configManager.set('startOnLogin', true);
+      } catch (err) {
+        console.warn('[Deskbird] Could not set login item:', err.message);
+      }
+    } else {
+      try {
+        app.setLoginItemSettings({ openAtLogin: false });
+        if (configManager) configManager.set('startOnLogin', false);
+      } catch {}
+    }
+
+    if (configManager) configManager.set('firstRun', false);
+
+    if (setupWindow && !setupWindow.isDestroyed()) {
+      setupWindow.close();
+    }
+  });
 
   app.on('second-instance', () => {
     console.log('[Deskbird] Second instance detected. Restoring bird to follow mode.');
@@ -130,8 +209,23 @@ if (!gotTheLock) {
       onTogglePause: (paused) => {
         windowManager.setPaused(paused);
         trayManager.updateMenu();
+      },
+      onShowSetup: () => {
+        showSetupDialog();
+      },
+      onCreateDesktopShortcut: () => {
+        createDesktopShortcut();
+        windowManager.showAnnouncement('Desktop shortcut created!');
       }
     });
+
+    // Ensure Start Menu shortcut always exists so Windows Search finds Deskbird
+    createStartMenuShortcut();
+
+    // Prompt setup dialog on first installation
+    if (configManager.get('firstRun')) {
+      showSetupDialog();
+    }
 
     trayManager.init();
     windowManager.createWindows();

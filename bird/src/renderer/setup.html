@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Deskbird Setup</title>
+  <style>
+    @font-face {
+      font-family: 'Press Start 2P';
+      src: url('assets/fonts/press-start-2p.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background-color: #fbf3dc;
+      color: #1a1d24;
+      font-family: 'Press Start 2P', monospace;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      border: 3px solid #1a1d24;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #1a1d24;
+      padding-bottom: 10px;
+    }
+    .title {
+      font-size: 11px;
+      line-height: 1.4;
+      color: #1a1d24;
+    }
+    .subtitle {
+      font-size: 7px;
+      color: #666;
+      margin-top: 3px;
+    }
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex: 1;
+    }
+    .option-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .option-row input[type="checkbox"] {
+      width: 15px;
+      height: 15px;
+      cursor: pointer;
+      accent-color: #3b82f6;
+    }
+    .option-label {
+      font-size: 8px;
+      line-height: 1.4;
+      cursor: pointer;
+    }
+    .tip {
+      font-size: 6px;
+      line-height: 1.5;
+      color: #7c5e28;
+      background: #f3e5c0;
+      padding: 8px;
+      border: 1px dashed #b59f6d;
+      margin-bottom: 12px;
+    }
+    .btn {
+      background: #1a1d24;
+      color: #fbf3dc;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      padding: 10px;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.1s;
+    }
+    .btn:hover {
+      background: #3b82f6;
+    }
+    .btn:active {
+      transform: scale(0.98);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="assets/bird-perched.png" style="width: 24px; height: 28px; image-rendering: pixelated;" alt="bird" />
+    <div>
+      <div class="title">DESKBIRD SETUP</div>
+      <div class="subtitle">Quick Shortcut Options</div>
+    </div>
+  </div>
+
+  <div class="options">
+    <label class="option-row">
+      <input type="checkbox" id="chk-desktop" checked />
+      <span class="option-label">Create a Desktop icon</span>
+    </label>
+
+    <label class="option-row">
+      <input type="checkbox" id="chk-taskbar" checked />
+      <span class="option-label">Create a Taskbar icon</span>
+    </label>
+
+    <label class="option-row">
+      <input type="checkbox" id="chk-boot" checked />
+      <span class="option-label">Start with Windows</span>
+    </label>
+  </div>
+
+  <div class="tip">
+    Search 'Deskbird' in Windows Start menu to open anytime!
+  </div>
+
+  <button id="btn-save" class="btn">SAVE & START</button>
+
+  <script>
+    document.getElementById('btn-save').addEventListener('click', () => {
+      const desktopShortcut = document.getElementById('chk-desktop').checked;
+      const taskbarShortcut = document.getElementById('chk-taskbar').checked;
+      const startOnBoot = document.getElementById('chk-boot').checked;
+
+      if (window.deskbirdApi && window.deskbirdApi.saveSetup) {
+        window.deskbirdApi.saveSetup({ desktopShortcut, taskbarShortcut, startOnBoot });
+      } else {
+        window.close();
+      }
+    });
+  </script>
+</body>
+</html>

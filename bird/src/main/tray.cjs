@@ -9,6 +9,8 @@ class TrayManager {
     this.onTogglePerch = options.onTogglePerch || (() => {});
     this.onToggleSound = options.onToggleSound || (() => {});
     this.onTogglePause = options.onTogglePause || (() => {});
+    this.onShowSetup = options.onShowSetup || (() => {});
+    this.onCreateDesktopShortcut = options.onCreateDesktopShortcut || (() => {});
     this.tray = null;
     this.connectionStatus = 'connecting';
   }
@@ -78,6 +80,18 @@ class TrayManager {
         label: 'Show My Code',
         click: () => {
           this.windowManager.showAnnouncement(`Hi! Tell your friend this code: ${formattedCode}`);
+        }
+      },
+      {
+        label: 'Create Desktop Shortcut',
+        click: () => {
+          this.onCreateDesktopShortcut();
+        }
+      },
+      {
+        label: 'Shortcut Setup...',
+        click: () => {
+          this.onShowSetup();
         }
       },
       { type: 'separator' },
