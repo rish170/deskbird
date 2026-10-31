@@ -2,6 +2,9 @@
   "name": "deskbird-workspace",
   "private": true,
   "type": "module",
+  "bin": {
+    "deskbird": "bird/bin/deskbird.js"
+  },
   "workspaces": [
     "shared",
     "bird",
