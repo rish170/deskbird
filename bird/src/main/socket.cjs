@@ -9,6 +9,7 @@ class BirdSocketClient {
     this.heartbeatIntervalMs = options.heartbeatIntervalMs || 240000;
     this.onMessage = options.onMessage || (() => {});
     this.onStateChange = options.onStateChange || (() => {});
+    this.onRoomConfirmed = options.onRoomConfirmed || (() => {});
     this.socket = null;
     this.heartbeatTimer = null;
     this.state = 'offline'; // 'connected' | 'reconnecting' | 'offline'
@@ -45,6 +46,9 @@ class BirdSocketClient {
         (res) => {
           if (res && res.ok) {
             console.log(`[Deskbird Main] Bird successfully joined room: ${res.roomId} (${res.queued} queued msgs)`);
+            if (res.roomId) {
+              this.onRoomConfirmed(res.roomId);
+            }
           } else {
             console.warn('[Deskbird Main] Failed to join room:', res ? res.code : 'unknown');
           }

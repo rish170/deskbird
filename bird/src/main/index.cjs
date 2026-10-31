@@ -147,6 +147,13 @@ if (!gotTheLock) {
         onMessage: (msg) => {
           windowManager.deliverMessage(msg);
         },
+        onRoomConfirmed: (confirmedRoomId) => {
+          configManager.set('roomId', confirmedRoomId);
+          if (trayManager) {
+            trayManager.updateTooltip();
+            trayManager.updateMenu();
+          }
+        },
         onStateChange: (state) => {
           trayManager.setConnectionStatus(state);
         }

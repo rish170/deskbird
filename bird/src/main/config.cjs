@@ -86,6 +86,11 @@ class ConfigManager {
     if (this.isLocal) {
       settings.secret = LOCAL_TEST_SECRET;
       settings.roomId = LOCAL_TEST_ROOM_ID;
+    } else if (!settings.secret || settings.secret === LOCAL_TEST_SECRET) {
+      // Transitioning from local test mode to production: generate real persistent secret
+      settings.secret = crypto.randomBytes(32).toString('hex');
+      settings.roomId = deriveRoomId(settings.secret, 'production');
+      this.saveSettings(settings);
     }
 
     // Bird always starts perched on application launch
