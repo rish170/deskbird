@@ -1,6 +1,6 @@
 const path = require('path');
 const { Tray, Menu, clipboard, nativeImage, app } = require('electron');
-const { formatRoomId } = require('deskbird-shared');
+const { formatRoomId } = require('./protocol.cjs');
 
 class TrayManager {
   constructor(options = {}) {

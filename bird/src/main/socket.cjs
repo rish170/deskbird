@@ -1,5 +1,5 @@
 const { io } = require('socket.io-client');
-const { EVENTS, PROTOCOL_VERSION } = require('deskbird-shared');
+const { EVENTS, PROTOCOL_VERSION } = require('./protocol.cjs');
 
 class BirdSocketClient {
   constructor(options = {}) {
