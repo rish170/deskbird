@@ -118,7 +118,16 @@ function promptForRoom() {
     socket.disconnect();
     socket = null;
   }
-  window.location.hash = '';
+  safeSetItem('deskbird_last_room', '');
+  try {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', window.location.pathname);
+    } else {
+      window.location.hash = '';
+    }
+  } catch {
+    window.location.hash = '';
+  }
   roomActiveContainer.classList.add('hidden');
   roomInputForm.classList.remove('hidden');
   roomCodeInput.value = '';
@@ -392,9 +401,14 @@ function initEventListeners() {
 
   // Hash changes in browser URL
   window.addEventListener('hashchange', () => {
-    const newRoom = getInitialRoomId();
-    if (newRoom && newRoom !== currentRoomId) {
-      setRoom(newRoom);
+    const hash = window.location.hash.replace(/^#\/?/, '').trim();
+    if (!hash) {
+      promptForRoom();
+      return;
+    }
+    const norm = normalizeRoomId(hash);
+    if (isValidRoomId(norm) && norm !== currentRoomId) {
+      setRoom(norm);
     }
   });
 }

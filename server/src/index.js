@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -28,6 +28,25 @@ export function createDeskbirdServer(options = {}) {
     .map((o) => o.trim())
     .filter(Boolean);
 
+  const isOriginAllowed = (origin) => {
+    if (!origin) return true;
+    const clean = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(clean) || allowedOrigins.includes(origin)) {
+      return true;
+    }
+    try {
+      const parsed = new URL(clean);
+      if (
+        parsed.hostname.endsWith('.vercel.app') ||
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1'
+      ) {
+        return true;
+      }
+    } catch {}
+    return false;
+  };
+
   const app = express();
   const httpServer = http.createServer(app);
 
@@ -36,9 +55,7 @@ export function createDeskbirdServer(options = {}) {
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps, curl, electron)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        if (isOriginAllowed(origin)) {
           return callback(null, true);
         }
         return callback(new Error('Not allowed by CORS'));
@@ -47,6 +64,17 @@ export function createDeskbirdServer(options = {}) {
     })
   );
   app.use(express.json());
+
+  // Root welcoming route
+  app.get('/', (req, res) => {
+    res.json({
+      name: 'Deskbird Server',
+      status: 'healthy',
+      ok: true,
+      version: PROTOCOL_VERSION,
+      env: nodeEnv
+    });
+  });
 
   // Health check endpoint (used by Render and web client wakeup)
   app.get('/healthz', (req, res) => {
@@ -63,8 +91,7 @@ export function createDeskbirdServer(options = {}) {
   const io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        if (isOriginAllowed(origin)) {
           return callback(null, true);
         }
         return callback(new Error('CORS origin rejected'));
