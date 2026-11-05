@@ -3,7 +3,6 @@ import { io as ioClient } from 'socket.io-client';
 import {
   EVENTS,
   MESSAGE_STATUS,
-  LOCAL_TEST_SECRET,
   LOCAL_TEST_ROOM_ID
 } from 'deskbird-shared';
 import { createDeskbirdServer } from '../src/index.js';

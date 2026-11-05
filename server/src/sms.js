@@ -1,7 +1,11 @@
 /**
  * SMS Notification Service for Deskbird
  * Uses Twilio REST API via native fetch (no external npm dependencies required).
- * If Twilio credentials are not set, it operates in simulated mode and logs to console.
+ * Supports:
+ *  1. Direct Twilio phone numbers (From: +1...)
+ *  2. Twilio Messaging Services (MessagingServiceSid: MG...)
+ *  3. Zero-config auto-detection: If only TWILIO_ACCOUNT_SID & TWILIO_AUTH_TOKEN are provided,
+ *     it automatically queries Twilio to find your active Messaging Service or pooled trial sender!
  */
 
 import { URLSearchParams } from 'node:url';
@@ -13,11 +17,12 @@ export class SmsService {
     this.accountSid = options.accountSid || process.env.TWILIO_ACCOUNT_SID;
     this.authToken = options.authToken || process.env.TWILIO_AUTH_TOKEN;
     this.fromNumber = options.fromNumber || process.env.TWILIO_PHONE_NUMBER;
+    this.cachedSender = null;
     this.lastSentTimes = new Map(); // roomId -> timestamp
   }
 
   isConfigured() {
-    return Boolean(this.accountSid && this.authToken && this.fromNumber);
+    return Boolean(this.accountSid && this.authToken);
   }
 
   canSendForRoom(roomId, now = Date.now()) {
@@ -51,6 +56,67 @@ export class SmsService {
   }
 
   /**
+   * Resolve sender (either From phone number or MessagingServiceSid).
+   * Automatically queries Twilio if TWILIO_PHONE_NUMBER was not explicitly set.
+   */
+  async resolveSender() {
+    if (this.cachedSender) return this.cachedSender;
+
+    // 1. Explicitly configured fromNumber or MessagingServiceSid
+    if (this.fromNumber) {
+      const clean = this.fromNumber.trim();
+      if (/^MG/i.test(clean)) {
+        this.cachedSender = { key: 'MessagingServiceSid', value: clean };
+        return this.cachedSender;
+      }
+      this.cachedSender = { key: 'From', value: clean };
+      return this.cachedSender;
+    }
+
+    // 2. Auto-detect from Twilio account using SID & Token
+    const auth = Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64');
+
+    // Try finding an active Messaging Service (used by Twilio trial random number pool)
+    try {
+      const msRes = await fetch('https://messaging.twilio.com/v1/Services', {
+        headers: { Authorization: `Basic ${auth}` }
+      });
+      if (msRes.ok) {
+        const msData = await msRes.json();
+        if (msData.services && msData.services.length > 0) {
+          const serviceSid = msData.services[0].sid;
+          console.log(`[Deskbird SMS] Auto-detected Twilio Messaging Service: ${serviceSid}`);
+          this.cachedSender = { key: 'MessagingServiceSid', value: serviceSid };
+          return this.cachedSender;
+        }
+      }
+    } catch (err) {
+      console.warn('[Deskbird SMS] Could not query Messaging Services:', err.message);
+    }
+
+    // Try finding an active phone number on the account
+    try {
+      const pnRes = await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/IncomingPhoneNumbers.json`,
+        { headers: { Authorization: `Basic ${auth}` } }
+      );
+      if (pnRes.ok) {
+        const pnData = await pnRes.json();
+        if (pnData.incoming_phone_numbers && pnData.incoming_phone_numbers.length > 0) {
+          const number = pnData.incoming_phone_numbers[0].phone_number;
+          console.log(`[Deskbird SMS] Auto-detected Twilio Phone Number: ${number}`);
+          this.cachedSender = { key: 'From', value: number };
+          return this.cachedSender;
+        }
+      }
+    } catch (err) {
+      console.warn('[Deskbird SMS] Could not query Incoming Phone Numbers:', err.message);
+    }
+
+    return null;
+  }
+
+  /**
    * Send an SMS message
    */
   async sendSms({ to, body, roomId = null, bypassCooldown = false }) {
@@ -74,14 +140,22 @@ export class SmsService {
     }
 
     try {
+      const sender = await this.resolveSender();
+      if (!sender) {
+        return {
+          ok: false,
+          error: 'Could not auto-detect a sender from your Twilio account. Please set TWILIO_PHONE_NUMBER in Render.'
+        };
+      }
+
       const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
       const auth = Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64');
 
       const params = new URLSearchParams({
         To: to,
-        From: this.fromNumber,
         Body: body
       });
+      params.append(sender.key, sender.value);
 
       const response = await fetch(url, {
         method: 'POST',
