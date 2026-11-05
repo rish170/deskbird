@@ -14,8 +14,13 @@ export class RateLimiter {
    */
   checkSender(socketId, now = Date.now()) {
     const lastTime = this.senderLastMessageTimes.get(socketId);
-    if (lastTime && now - lastTime < this.senderMinIntervalMs) {
-      const retryAfterMs = this.senderMinIntervalMs - (now - lastTime);
+    if (!lastTime) return { allowed: true };
+
+    const elapsed = now - lastTime;
+    // 150ms grace margin protects against browser setTimeout drift and network latency jitter
+    const effectiveInterval = Math.max(200, this.senderMinIntervalMs - 150);
+    if (elapsed < effectiveInterval) {
+      const retryAfterMs = Math.max(100, this.senderMinIntervalMs - elapsed);
       return { allowed: false, retryAfterMs };
     }
     return { allowed: true };

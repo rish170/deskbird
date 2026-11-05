@@ -76,6 +76,14 @@ export class RoomManager {
     return room.messageTimestamps.length < this.roomHourlyLimit;
   }
 
+  getRoomRetryAfterMs(roomId, now = Date.now()) {
+    const room = this.getRoom(roomId);
+    if (!room || room.messageTimestamps.length === 0) return 60000;
+    const oldest = room.messageTimestamps[0];
+    const hourMs = 3600000;
+    return Math.max(1000, hourMs - (now - oldest));
+  }
+
   recordRoomMessage(roomId, now = Date.now()) {
     const room = this.getOrCreateRoom(roomId);
     room.messageTimestamps.push(now);

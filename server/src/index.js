@@ -312,9 +312,14 @@ export function createDeskbirdServer(options = {}) {
         });
       }
 
-      // Check per-room rate limit (30 msgs per hour)
+      // Check per-room rate limit
       if (!roomManager.canSendToRoom(roomId)) {
-        return ack({ ok: false, code: ERROR_CODES.RATE_LIMITED });
+        return ack({
+          ok: false,
+          code: ERROR_CODES.RATE_LIMITED,
+          retryAfterMs: roomManager.getRoomRetryAfterMs(roomId),
+          error: 'Room hourly message limit reached. Please wait a bit before sending more messages.'
+        });
       }
 
       // Validate message content

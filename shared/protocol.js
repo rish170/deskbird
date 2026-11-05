@@ -10,10 +10,10 @@ export const LOCAL_TEST_ROOM_ID = 'LCLTEST2';
 export const LIMITS = {
   MAX_TEXT_LENGTH: 120,
   MAX_FROM_LENGTH: 12,
-  MAX_QUEUE: 20,
+  MAX_QUEUE: 50,
   MESSAGE_TTL_MS: 24 * 60 * 60 * 1000, // 24 hours
-  RATE_LIMIT_SENDER_INTERVAL_MS: 2000, // 1 msg per 2s per sender socket
-  RATE_LIMIT_ROOM_HOURLY: 30, // 30 msgs per hour per room
+  RATE_LIMIT_SENDER_INTERVAL_MS: 1500, // 1 msg per 1.5s per sender socket
+  RATE_LIMIT_ROOM_HOURLY: 500, // 500 msgs per hour per room
   HEARTBEAT_INTERVAL_MS: 4 * 60 * 1000, // 4 minutes
   MIN_DISPLAY_TIME_MS: 2500,
   MAX_DISPLAY_TIME_MS: 12000,

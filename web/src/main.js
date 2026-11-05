@@ -59,6 +59,7 @@ let _currentView = 'main'; // 'main' | 'status' | 'history'
 let socket = null;
 let isBirdOnline = false;
 let isRateLimited = false;
+let isSending = false;
 let rateLimitTimer = null;
 const messages = new Map(); // msgId -> { id, text, from, status, ts }
 
@@ -523,6 +524,11 @@ function connectSocket() {
   });
 
   socket.on('connect', () => {
+    isSending = false;
+    if (!isRateLimited) {
+      sendButton.disabled = false;
+      sendButton.classList.remove('btn-disabled');
+    }
     setStatus('waking', 'joining room...');
     socket.emit(EVENTS.SENDER_JOIN, { roomId: currentRoomId }, (res) => {
       if (res && res.ok) {
@@ -555,6 +561,11 @@ function connectSocket() {
   });
 
   socket.on('disconnect', () => {
+    isSending = false;
+    if (!isRateLimited) {
+      sendButton.disabled = false;
+      sendButton.classList.remove('btn-disabled');
+    }
     setStatus('offline', 'disconnected - reconnecting...');
   });
 
@@ -565,8 +576,15 @@ function connectSocket() {
 
 // Send Message Flow
 function handleSendMessage() {
+  if (isSending) return;
+
   if (!currentRoomId) {
     showError('Please connect to a bird room first.');
+    return;
+  }
+
+  if (!socket || !socket.connected) {
+    showError('Connecting to server... Please wait a moment.');
     return;
   }
 
@@ -579,7 +597,7 @@ function handleSendMessage() {
   }
 
   if (isRateLimited) {
-    showError('Please wait before sending another message.');
+    showError('Please wait a moment before sending another message.');
     return;
   }
 
@@ -588,6 +606,8 @@ function handleSendMessage() {
   }
 
   clearError();
+  isSending = true;
+  sendButton.disabled = true;
 
   const tempId = `temp_${Date.now()}`;
   const messageData = {
@@ -601,15 +621,24 @@ function handleSendMessage() {
   messages.set(tempId, messageData);
   renderMessageLog();
 
-  sendButton.disabled = true;
-  messageTextInput.value = '';
-  charCounter.textContent = '0 / 120';
-  charCounter.classList.remove('counter-warning');
-
-  socket.emit(EVENTS.MESSAGE_SEND, { text, from }, (res) => {
+  // 8-second timeout ensures sendButton and app never get permanently stuck
+  socket.timeout(8000).emit(EVENTS.MESSAGE_SEND, { text, from }, (err, res) => {
+    isSending = false;
     sendButton.disabled = false;
 
+    if (err) {
+      messages.delete(tempId);
+      renderMessageLog();
+      showError('Message timed out. Please check your connection and try again.');
+      return;
+    }
+
     if (res && res.ok) {
+      // Clear input only on success
+      messageTextInput.value = '';
+      charCounter.textContent = '0 / 120';
+      charCounter.classList.remove('counter-warning');
+
       messages.delete(tempId);
       messages.set(res.id, {
         id: res.id,
@@ -620,20 +649,20 @@ function handleSendMessage() {
       });
       renderMessageLog();
 
-      // Trigger 2-second rate limit cooldown
-      startRateLimitCooldown(2000);
+      // Trigger 1.2-second rate limit cooldown (smooth chat without false alarms)
+      startRateLimitCooldown(1200);
     } else {
       messages.delete(tempId);
       renderMessageLog();
 
       if (res && res.code === ERROR_CODES.RATE_LIMITED) {
-        const retryMs = res.retryAfterMs || 2000;
-        showError(`Slow down! You can send another message in a moment.`);
+        const retryMs = Math.max(1000, res.retryAfterMs || 1500);
+        showError(res.error || 'Slow down! You can send another message in a moment.');
         startRateLimitCooldown(retryMs);
       } else if (res && res.code === ERROR_CODES.QUEUE_FULL) {
         showError('The bird is offline and its queue is full. Try again soon!');
       } else {
-        showError(res ? `Error: ${res.code}` : 'Failed to send message.');
+        showError(res && res.error ? res.error : (res ? `Error: ${res.code}` : 'Failed to send message.'));
       }
     }
   });
@@ -649,6 +678,7 @@ function startRateLimitCooldown(durationMs) {
     isRateLimited = false;
     sendButton.disabled = false;
     sendButton.classList.remove('btn-disabled');
+    clearError();
   }, durationMs);
 }
 
@@ -677,13 +707,17 @@ function initEventListeners() {
   messageTextInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      if (!isSending && !isRateLimited) {
+        handleSendMessage();
+      }
     }
   });
 
   messageForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    handleSendMessage();
+    if (!isSending && !isRateLimited) {
+      handleSendMessage();
+    }
   });
 
   // Feature 1 Listeners (Status & SMS)
