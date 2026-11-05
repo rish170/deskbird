@@ -17,7 +17,9 @@ export class SmsService {
     this.accountSid = options.accountSid || process.env.TWILIO_ACCOUNT_SID;
     this.authToken = options.authToken || process.env.TWILIO_AUTH_TOKEN;
     this.fromNumber = options.fromNumber || process.env.TWILIO_PHONE_NUMBER;
+    this.trialTemplate = options.trialTemplate || process.env.TWILIO_TRIAL_TEMPLATE || 'sms_event_notifications';
     this.cachedSender = null;
+    this.isTrialAccount = false;
     this.lastSentTimes = new Map(); // roomId -> timestamp
   }
 
@@ -151,13 +153,14 @@ export class SmsService {
       const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
       const auth = Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64');
 
+      const requestBody = this.isTrialAccount ? this.trialTemplate : body;
       const params = new URLSearchParams({
         To: to,
-        Body: body
+        Body: requestBody
       });
       params.append(sender.key, sender.value);
 
-      const response = await fetch(url, {
+      let response = await fetch(url, {
         method: 'POST',
         headers: {
           Authorization: `Basic ${auth}`,
@@ -166,15 +169,37 @@ export class SmsService {
         body: params.toString()
       });
 
-      const data = await response.json();
+      let data = await response.json();
+
+      // If Twilio trial account restricts custom text (Error 572006), retry with pre-approved trial template
+      if (!response.ok && data.code === 572006 && !this.isTrialAccount) {
+        console.warn(`[Deskbird SMS] Trial account detected (code 572006). Retrying with trial template: "${this.trialTemplate}"`);
+        this.isTrialAccount = true;
+        const retryParams = new URLSearchParams({
+          To: to,
+          Body: this.trialTemplate
+        });
+        retryParams.append(sender.key, sender.value);
+
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${auth}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: retryParams.toString()
+        });
+        data = await response.json();
+      }
+
       if (!response.ok) {
         console.error('[Deskbird SMS] Twilio API Error:', data);
         return { ok: false, error: data.message || 'Failed to send SMS through Twilio.' };
       }
 
-      console.log(`[Deskbird SMS] Sent SMS to ${to} (SID: ${data.sid})`);
+      console.log(`[Deskbird SMS] Sent SMS to ${to} (SID: ${data.sid}${this.isTrialAccount ? ', trial mode' : ''})`);
       if (roomId) this.recordSent(roomId);
-      return { ok: true, sid: data.sid };
+      return { ok: true, sid: data.sid, trialMode: this.isTrialAccount };
     } catch (err) {
       console.error('[Deskbird SMS] Network Error:', err.message);
       return { ok: false, error: err.message };

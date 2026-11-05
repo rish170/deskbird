@@ -122,5 +122,60 @@ describe('Feature 1 & 2: SMS Alerts and Message History Tests', () => {
     expect(msg.from).toBe('TestBot');
     expect(msg.status).toBe(MESSAGE_STATUS.QUEUED);
   });
+
+  it('SmsService handles Twilio trial error 572006 by retrying with trial template', async () => {
+    const { SmsService } = await import('../src/sms.js');
+    const service = new SmsService({
+      accountSid: 'AC_TEST',
+      authToken: 'AUTH_TEST',
+      fromNumber: '+17372508034'
+    });
+
+    const calls = [];
+    const origFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async (url, opts) => {
+        calls.push({ url, body: opts.body });
+        // First call fails with 572006
+        if (calls.length === 1) {
+          return {
+            ok: false,
+            json: async () => ({
+              code: 572006,
+              message: 'Invalid template name. Trial accounts can only use predefined SMS templates.'
+            })
+          };
+        }
+        // Retry call succeeds
+        return {
+          ok: true,
+          json: async () => ({ sid: 'SM_TRIAL_SUCCESS' })
+        };
+      };
+
+      const result = await service.sendSms({
+        to: '+919404082621',
+        body: 'Custom Deskbird Message'
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.trialMode).toBe(true);
+      expect(result.sid).toBe('SM_TRIAL_SUCCESS');
+      expect(calls.length).toBe(2);
+      expect(calls[0].body).toContain('Custom+Deskbird+Message');
+      expect(calls[1].body).toContain('sms_event_notifications');
+
+      // Subsequent call should directly use trial template
+      const nextResult = await service.sendSms({
+        to: '+919404082621',
+        body: 'Another Message'
+      });
+      expect(nextResult.ok).toBe(true);
+      expect(calls.length).toBe(3);
+      expect(calls[2].body).toContain('sms_event_notifications');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+  });
 });
 

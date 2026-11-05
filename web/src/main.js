@@ -371,7 +371,12 @@ async function handleTestSms() {
     });
     const data = await res.json();
     if (res.ok && data.ok) {
-      const note = data.simulated ? ' (Simulated in server logs)' : '';
+      let note = '';
+      if (data.simulated) {
+        note = ' (Simulated in server logs)';
+      } else if (data.trialMode) {
+        note = ' (Delivered via Twilio trial template)';
+      }
       showSmsAlert(`Test SMS sent successfully!${note}`, 'success');
     } else {
       showSmsAlert(data.error || 'Failed to send test SMS.', 'error');
