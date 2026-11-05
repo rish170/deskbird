@@ -49,58 +49,134 @@
           </form>
         </section>
 
-        <!-- Server & Bird Status Pill -->
-        <div class="status-container">
-          <div id="status-pill" class="status-pill status-waking" role="status" aria-live="polite">
-            <span class="status-indicator"></span>
-            <span id="status-text">waking the server...</span>
+        <!-- Main Message View Container (Default, Clean, No Links to Status/History) -->
+        <div id="main-view">
+          <!-- Server & Bird Status Pill -->
+          <div class="status-container">
+            <div id="status-pill" class="status-pill status-waking" role="status" aria-live="polite">
+              <span class="status-indicator"></span>
+              <span id="status-text">waking the server...</span>
+            </div>
+          </div>
+
+          <!-- Message Compose Form -->
+          <form id="message-form" class="message-form" autocomplete="off">
+            <div class="form-row">
+              <label for="sender-name-input" class="sub-label">YOUR NAME (OPTIONAL):</label>
+              <input
+                id="sender-name-input"
+                type="text"
+                class="pixel-input sender-name-input"
+                placeholder="Alex"
+                maxlength="12"
+                spellcheck="false"
+              />
+            </div>
+
+            <div class="form-row">
+              <div class="label-with-counter">
+                <label for="message-text-input" class="sub-label">MESSAGE:</label>
+                <span id="char-counter" class="char-counter">0 / 120</span>
+              </div>
+              <textarea
+                id="message-text-input"
+                class="pixel-textarea"
+                rows="3"
+                maxlength="120"
+                placeholder="Type a friendly message..."
+                required
+              ></textarea>
+              <div class="input-hint">Enter sends, Shift+Enter makes a new line</div>
+            </div>
+
+            <div id="form-error-alert" class="error-alert hidden" role="alert"></div>
+
+            <button id="send-button" type="submit" class="btn-send">
+              SEND MESSAGE
+            </button>
+          </form>
+
+          <!-- Message History Log -->
+          <section class="messages-section" aria-labelledby="history-label">
+            <h2 id="history-label" class="sub-label">SENT MESSAGES:</h2>
+            <div id="message-log" class="message-log" role="log" aria-live="polite">
+              <div class="empty-log-hint">No messages sent yet. Say hello!</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Dedicated Status View Container (Accessible ONLY via #/<room-code>/status) -->
+        <div id="status-view" class="hidden">
+          <div class="view-header">
+            <h2 class="view-title">BIRD STATUS & NOTIFICATIONS</h2>
+            <p class="view-subtitle">Live connection status & SMS alerts</p>
+          </div>
+
+          <!-- Live Status Indicator -->
+          <div class="status-box-panel">
+            <div class="sub-label">CURRENT BIRD STATE:</div>
+            <div id="status-view-pill" class="status-pill status-offline">
+              <span class="status-indicator"></span>
+              <span id="status-view-state-text">checking bird state...</span>
+            </div>
+          </div>
+
+          <!-- SMS Notification Box -->
+          <div class="feature-box">
+            <h3 class="feature-title">SMS ONLINE NOTIFICATION</h3>
+            <p class="feature-desc">
+              Get an instant text message on your phone the moment your friend's laptop wakes up or comes online!
+            </p>
+
+            <form id="sms-form" class="sms-form" autocomplete="off">
+              <label for="sms-phone-input" class="sub-label">RECEIVER'S PHONE NUMBER:</label>
+              <div class="sms-input-row">
+                <input
+                  id="sms-phone-input"
+                  type="tel"
+                  class="pixel-input"
+                  placeholder="+1234567890"
+                  required
+                />
+              </div>
+              <div class="input-hint">Include country code with + (e.g. +1... or +91...)</div>
+
+              <div id="sms-feedback-alert" class="sms-alert hidden"></div>
+
+              <button id="sms-save-btn" type="submit" class="btn-primary btn-full">
+                SAVE NOTIFICATION NUMBER
+              </button>
+            </form>
+
+            <div id="sms-active-container" class="sms-active-container hidden">
+              <div class="sms-active-badge">
+                <span class="sms-active-icon">✓</span>
+                <span>ALERTS ACTIVE FOR:</span>
+                <strong id="sms-active-number">----</strong>
+              </div>
+              <div class="sms-actions-row">
+                <button id="sms-test-btn" type="button" class="btn-small">SEND TEST SMS</button>
+                <button id="sms-remove-btn" type="button" class="btn-small btn-danger">REMOVE</button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Message Compose Form -->
-        <form id="message-form" class="message-form" autocomplete="off">
-          <div class="form-row">
-            <label for="sender-name-input" class="sub-label">YOUR NAME (OPTIONAL):</label>
-            <input
-              id="sender-name-input"
-              type="text"
-              class="pixel-input sender-name-input"
-              placeholder="Alex"
-              maxlength="12"
-              spellcheck="false"
-            />
+        <!-- Dedicated History View Container (Accessible ONLY via #/<room-code>/history) -->
+        <div id="history-view" class="hidden">
+          <div class="view-header">
+            <h2 class="view-title">MESSAGE HISTORY</h2>
+            <p class="view-subtitle">Archived messages sent to this bird</p>
           </div>
 
-          <div class="form-row">
-            <div class="label-with-counter">
-              <label for="message-text-input" class="sub-label">MESSAGE:</label>
-              <span id="char-counter" class="char-counter">0 / 120</span>
-            </div>
-            <textarea
-              id="message-text-input"
-              class="pixel-textarea"
-              rows="3"
-              maxlength="120"
-              placeholder="Type a friendly message..."
-              required
-            ></textarea>
-            <div class="input-hint">Enter sends, Shift+Enter makes a new line</div>
+          <div class="history-controls">
+            <button id="history-refresh-btn" type="button" class="btn-small">REFRESH HISTORY</button>
           </div>
 
-          <div id="form-error-alert" class="error-alert hidden" role="alert"></div>
-
-          <button id="send-button" type="submit" class="btn-send">
-            SEND MESSAGE
-          </button>
-        </form>
-
-        <!-- Message History Log -->
-        <section class="messages-section" aria-labelledby="history-label">
-          <h2 id="history-label" class="sub-label">SENT MESSAGES:</h2>
-          <div id="message-log" class="message-log" role="log" aria-live="polite">
-            <div class="empty-log-hint">No messages sent yet. Say hello!</div>
+          <div id="history-view-log" class="history-view-log">
+            <div class="empty-log-hint">Loading message history...</div>
           </div>
-        </section>
+        </div>
       </main>
     </div>
 

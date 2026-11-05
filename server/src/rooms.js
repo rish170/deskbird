@@ -5,6 +5,7 @@ export class RoomManager {
     this.maxQueue = options.maxQueue || LIMITS.MAX_QUEUE;
     this.messageTtlMs = options.messageTtlMs || LIMITS.MESSAGE_TTL_MS;
     this.roomHourlyLimit = options.roomHourlyLimit || LIMITS.RATE_LIMIT_ROOM_HOURLY;
+    this.maxHistory = options.maxHistory || 200;
     this.rooms = new Map(); // roomId -> Room
     this.socketToBirdRoom = new Map(); // socketId -> roomId
   }
@@ -15,6 +16,8 @@ export class RoomManager {
         roomId,
         birdSocketId: null,
         queue: [], // Array<{ id, text, from, ts, status }>
+        history: [], // Array<{ id, text, from, ts, status }>
+        smsPhone: null, // Subscribed phone number for bird online alerts
         messageTimestamps: [] // for hourly rate limiting
       });
     }
@@ -108,5 +111,48 @@ export class RoomManager {
     }
     return false;
   }
-}
 
+  recordHistory(roomId, message, initialStatus = MESSAGE_STATUS.DELIVERED) {
+    const room = this.getOrCreateRoom(roomId);
+    const item = {
+      id: message.id,
+      text: message.text,
+      from: message.from || 'Anonymous',
+      ts: message.ts || Date.now(),
+      status: initialStatus
+    };
+    room.history.push(item);
+    if (room.history.length > this.maxHistory) {
+      room.history.shift();
+    }
+    return item;
+  }
+
+  updateHistoryStatus(roomId, messageId, status) {
+    const room = this.getRoom(roomId);
+    if (!room) return false;
+    const msg = room.history.find((m) => m.id === messageId);
+    if (msg) {
+      msg.status = status;
+      return true;
+    }
+    return false;
+  }
+
+  getHistory(roomId) {
+    const room = this.getRoom(roomId);
+    if (!room) return [];
+    return [...room.history];
+  }
+
+  setSmsPhone(roomId, phone) {
+    const room = this.getOrCreateRoom(roomId);
+    room.smsPhone = phone ? phone.trim() : null;
+    return room.smsPhone;
+  }
+
+  getSmsPhone(roomId) {
+    const room = this.getRoom(roomId);
+    return room ? room.smsPhone : null;
+  }
+}

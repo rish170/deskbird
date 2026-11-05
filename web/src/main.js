@@ -15,16 +15,21 @@ const SERVER_URL =
     ? 'https://deskbird-server.onrender.com'
     : 'http://localhost:3001');
 
-// DOM Elements
+// Top-level Room DOM Elements
 const roomActiveContainer = document.getElementById('room-active-container');
 const roomCodeDisplay = document.getElementById('room-code-display');
 const changeRoomBtn = document.getElementById('change-room-btn');
 const roomInputForm = document.getElementById('room-input-form');
 const roomCodeInput = document.getElementById('room-code-input');
 
+// View Containers
+const mainView = document.getElementById('main-view');
+const statusView = document.getElementById('status-view');
+const historyView = document.getElementById('history-view');
+
+// Main View DOM Elements
 const statusPill = document.getElementById('status-pill');
 const statusText = document.getElementById('status-text');
-
 const messageForm = document.getElementById('message-form');
 const senderNameInput = document.getElementById('sender-name-input');
 const messageTextInput = document.getElementById('message-text-input');
@@ -33,8 +38,24 @@ const sendButton = document.getElementById('send-button');
 const formErrorAlert = document.getElementById('form-error-alert');
 const messageLog = document.getElementById('message-log');
 
+// Status View DOM Elements
+const statusViewPill = document.getElementById('status-view-pill');
+const statusViewStateText = document.getElementById('status-view-state-text');
+const smsForm = document.getElementById('sms-form');
+const smsPhoneInput = document.getElementById('sms-phone-input');
+const smsFeedbackAlert = document.getElementById('sms-feedback-alert');
+const smsActiveContainer = document.getElementById('sms-active-container');
+const smsActiveNumber = document.getElementById('sms-active-number');
+const smsTestBtn = document.getElementById('sms-test-btn');
+const smsRemoveBtn = document.getElementById('sms-remove-btn');
+
+// History View DOM Elements
+const historyViewLog = document.getElementById('history-view-log');
+const historyRefreshBtn = document.getElementById('history-refresh-btn');
+
 // State
 let currentRoomId = null;
+let _currentView = 'main'; // 'main' | 'status' | 'history'
 let socket = null;
 let isBirdOnline = false;
 let isRateLimited = false;
@@ -60,36 +81,97 @@ function safeSetItem(key, val) {
 
 // Status Pill Helpers
 function setStatus(type, message) {
-  statusPill.className = `status-pill status-${type}`;
-  statusText.textContent = message;
+  if (statusPill && statusText) {
+    statusPill.className = `status-pill status-${type}`;
+    statusText.textContent = message;
+  }
+  updateStatusViewPill(type === 'online');
+}
+
+function updateStatusViewPill(online) {
+  if (!statusViewPill || !statusViewStateText) return;
+  if (online) {
+    statusViewPill.className = 'status-pill status-online';
+    statusViewStateText.textContent = 'bird is currently online';
+  } else {
+    statusViewPill.className = 'status-pill status-offline';
+    statusViewStateText.textContent = 'bird is currently offline / asleep';
+  }
 }
 
 function showError(msg) {
-  formErrorAlert.textContent = msg;
-  formErrorAlert.classList.remove('hidden');
+  if (formErrorAlert) {
+    formErrorAlert.textContent = msg;
+    formErrorAlert.classList.remove('hidden');
+  }
 }
 
 function clearError() {
-  formErrorAlert.textContent = '';
-  formErrorAlert.classList.add('hidden');
+  if (formErrorAlert) {
+    formErrorAlert.textContent = '';
+    formErrorAlert.classList.add('hidden');
+  }
 }
 
-// Extract room ID from URL hash or storage
-function getInitialRoomId() {
-  const hash = window.location.hash.replace(/^#\/?/, '').trim();
-  if (hash) {
-    const norm = normalizeRoomId(hash);
-    if (isValidRoomId(norm)) {
-      return norm;
+// URL Hash Parser
+// #/abcd-1234 -> { roomId: 'ABCD1234', view: 'main' }
+// #/abcd-1234/status -> { roomId: 'ABCD1234', view: 'status' }
+// #/abcd-1234/history -> { roomId: 'ABCD1234', view: 'history' }
+function parseHashRoute() {
+  const raw = window.location.hash.replace(/^#\/?/, '').trim();
+  if (!raw) {
+    return { roomId: null, view: 'main' };
+  }
+  const parts = raw.split('/').filter(Boolean);
+  const norm = normalizeRoomId(parts[0]);
+  const subView = parts[1] ? parts[1].toLowerCase() : 'main';
+  return {
+    roomId: isValidRoomId(norm) ? norm : null,
+    view: ['status', 'history'].includes(subView) ? subView : 'main'
+  };
+}
+
+// View Switcher
+function switchView(viewName) {
+  _currentView = viewName;
+
+  mainView.classList.add('hidden');
+  statusView.classList.add('hidden');
+  historyView.classList.add('hidden');
+
+  if (viewName === 'status') {
+    statusView.classList.remove('hidden');
+    loadStatusView();
+  } else if (viewName === 'history') {
+    historyView.classList.remove('hidden');
+    loadHistoryView();
+  } else {
+    mainView.classList.remove('hidden');
+  }
+}
+
+// Route Handler
+function handleRoute() {
+  const route = parseHashRoute();
+  if (route.roomId) {
+    if (route.roomId !== currentRoomId) {
+      currentRoomId = route.roomId;
+      safeSetItem('deskbird_last_room', route.roomId);
+      roomCodeDisplay.textContent = formatRoomId(route.roomId);
+      roomActiveContainer.classList.remove('hidden');
+      roomInputForm.classList.add('hidden');
+      connectSocket();
+    }
+    switchView(route.view);
+  } else {
+    // If no valid room in hash, check localStorage
+    const saved = safeGetItem('deskbird_last_room');
+    if (saved && isValidRoomId(saved)) {
+      window.location.hash = `#/${saved}`;
+    } else {
+      promptForRoom();
     }
   }
-
-  const saved = safeGetItem('deskbird_last_room');
-  if (saved && isValidRoomId(saved)) {
-    return saved;
-  }
-
-  return null;
 }
 
 // Room UI Management
@@ -101,15 +183,8 @@ function setRoom(roomId) {
   }
 
   clearError();
-  currentRoomId = norm;
   safeSetItem('deskbird_last_room', norm);
   window.location.hash = `#/${norm}`;
-
-  roomCodeDisplay.textContent = formatRoomId(norm);
-  roomActiveContainer.classList.remove('hidden');
-  roomInputForm.classList.add('hidden');
-
-  connectSocket();
 }
 
 function promptForRoom() {
@@ -133,9 +208,10 @@ function promptForRoom() {
   roomCodeInput.value = '';
   roomCodeInput.focus();
   setStatus('offline', 'enter a bird code to connect');
+  switchView('main');
 }
 
-// Message Rendering in Log
+// Message Rendering in Main Log
 function renderMessageLog() {
   if (messages.size === 0) {
     messageLog.innerHTML = '<div class="empty-log-hint">No messages sent yet. Say hello!</div>';
@@ -195,9 +271,223 @@ function updateMessageStatus(id, newStatus) {
     m.status = newStatus;
     renderMessageLog();
   }
+  updateHistoryItemStatus(id, newStatus);
 }
 
-// Wake up Render backend
+// ============================================================================
+// Feature 1: Status & SMS Notifications (/#/<code>/status)
+// ============================================================================
+function showSmsAlert(text, type = 'info') {
+  smsFeedbackAlert.textContent = text;
+  smsFeedbackAlert.className = `sms-alert sms-alert-${type}`;
+  smsFeedbackAlert.classList.remove('hidden');
+}
+
+function hideSmsAlert() {
+  smsFeedbackAlert.textContent = '';
+  smsFeedbackAlert.classList.add('hidden');
+}
+
+async function loadStatusView() {
+  if (!currentRoomId) return;
+  updateStatusViewPill(isBirdOnline);
+  hideSmsAlert();
+
+  try {
+    const res = await fetch(`${SERVER_URL}/api/rooms/${currentRoomId}/status`);
+    if (res.ok) {
+      const data = await res.json();
+      updateStatusViewPill(data.online);
+      if (data.smsSubscribed && data.maskedPhone) {
+        smsActiveContainer.classList.remove('hidden');
+        smsActiveNumber.textContent = data.maskedPhone;
+        smsForm.classList.add('hidden');
+      } else {
+        smsActiveContainer.classList.add('hidden');
+        smsForm.classList.remove('hidden');
+      }
+    }
+  } catch (err) {
+    console.warn('[Deskbird Web] Failed to fetch room status:', err.message);
+  }
+}
+
+async function handleSaveSms(e) {
+  e.preventDefault();
+  if (!currentRoomId) return;
+  const phone = smsPhoneInput.value.trim();
+  if (!phone) return;
+
+  showSmsAlert('Saving notification number...', 'info');
+
+  try {
+    const res = await fetch(`${SERVER_URL}/api/rooms/${currentRoomId}/sms-subscription`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone })
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      showSmsAlert('Phone number saved! You will receive an SMS when this bird is online.', 'success');
+      smsActiveContainer.classList.remove('hidden');
+      smsActiveNumber.textContent = data.maskedPhone || phone;
+      smsForm.classList.add('hidden');
+      smsPhoneInput.value = '';
+    } else {
+      showSmsAlert(data.error || 'Failed to save phone number.', 'error');
+    }
+  } catch (err) {
+    showSmsAlert(`Network error: ${err.message}`, 'error');
+  }
+}
+
+async function handleRemoveSms() {
+  if (!currentRoomId) return;
+  showSmsAlert('Removing notification alerts...', 'info');
+
+  try {
+    const res = await fetch(`${SERVER_URL}/api/rooms/${currentRoomId}/sms-subscription`, {
+      method: 'DELETE'
+    });
+    if (res.ok) {
+      showSmsAlert('SMS alerts turned off for this room.', 'info');
+      smsActiveContainer.classList.add('hidden');
+      smsForm.classList.remove('hidden');
+    } else {
+      showSmsAlert('Failed to remove phone number.', 'error');
+    }
+  } catch (err) {
+    showSmsAlert(`Network error: ${err.message}`, 'error');
+  }
+}
+
+async function handleTestSms() {
+  if (!currentRoomId) return;
+  showSmsAlert('Sending test SMS...', 'info');
+
+  try {
+    const res = await fetch(`${SERVER_URL}/api/rooms/${currentRoomId}/sms-test`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      const note = data.simulated ? ' (Simulated in server logs)' : '';
+      showSmsAlert(`Test SMS sent successfully!${note}`, 'success');
+    } else {
+      showSmsAlert(data.error || 'Failed to send test SMS.', 'error');
+    }
+  } catch (err) {
+    showSmsAlert(`Network error: ${err.message}`, 'error');
+  }
+}
+
+// ============================================================================
+// Feature 2: Message History (/#/<code>/history)
+// ============================================================================
+async function loadHistoryView() {
+  if (!currentRoomId) return;
+  historyViewLog.innerHTML = '<div class="empty-log-hint">Loading archived messages...</div>';
+
+  try {
+    const res = await fetch(`${SERVER_URL}/api/rooms/${currentRoomId}/history`);
+    if (res.ok) {
+      const data = await res.json();
+      renderHistoryList(data.history || []);
+    } else {
+      historyViewLog.innerHTML = '<div class="empty-log-hint">Failed to load history.</div>';
+    }
+  } catch (err) {
+    historyViewLog.innerHTML = `<div class="empty-log-hint">Error: ${err.message}</div>`;
+  }
+}
+
+function renderHistoryList(historyItems) {
+  if (!historyItems || historyItems.length === 0) {
+    historyViewLog.innerHTML = '<div class="empty-log-hint">No message history found for this room.</div>';
+    return;
+  }
+
+  const sorted = [...historyItems].sort((a, b) => b.ts - a.ts);
+  historyViewLog.innerHTML = '';
+
+  for (const msg of sorted) {
+    const item = document.createElement('div');
+    item.className = 'message-item';
+    item.id = `hist-item-${msg.id}`;
+
+    const header = document.createElement('div');
+    header.className = 'message-item-header';
+
+    const senderSpan = document.createElement('span');
+    senderSpan.className = 'message-sender-name';
+    senderSpan.textContent = msg.from ? `From ${msg.from}` : 'Anonymous';
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'history-timestamp';
+    try {
+      timeSpan.textContent = new Date(msg.ts).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      timeSpan.textContent = '';
+    }
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `message-status-badge badge-${msg.status}`;
+    let statusLabel = msg.status;
+    let tick = '';
+    if (msg.status === MESSAGE_STATUS.DELIVERED) {
+      tick = ' ✓';
+      statusLabel = 'delivered';
+    } else if (msg.status === MESSAGE_STATUS.SEEN) {
+      tick = ' ✓✓';
+      statusLabel = 'seen by bird';
+    } else if (msg.status === MESSAGE_STATUS.QUEUED) {
+      statusLabel = 'queued';
+    }
+    statusBadge.textContent = `${statusLabel}${tick}`;
+
+    header.appendChild(senderSpan);
+    header.appendChild(timeSpan);
+    header.appendChild(statusBadge);
+
+    const body = document.createElement('div');
+    body.className = 'message-text';
+    body.textContent = msg.text;
+
+    item.appendChild(header);
+    item.appendChild(body);
+    historyViewLog.appendChild(item);
+  }
+}
+
+function updateHistoryItemStatus(id, newStatus) {
+  const item = document.getElementById(`hist-item-${id}`);
+  if (!item) return;
+  const badge = item.querySelector('.message-status-badge');
+  if (badge) {
+    badge.className = `message-status-badge badge-${newStatus}`;
+    let statusLabel = newStatus;
+    let tick = '';
+    if (newStatus === MESSAGE_STATUS.DELIVERED) {
+      tick = ' ✓';
+      statusLabel = 'delivered';
+    } else if (newStatus === MESSAGE_STATUS.SEEN) {
+      tick = ' ✓✓';
+      statusLabel = 'seen by bird';
+    } else if (newStatus === MESSAGE_STATUS.QUEUED) {
+      statusLabel = 'queued';
+    }
+    badge.textContent = `${statusLabel}${tick}`;
+  }
+}
+
+// ============================================================================
+// Backend Wakeup & Socket Management
+// ============================================================================
 async function wakeBackend() {
   setStatus('waking', 'waking the server (may take ~30s)...');
   try {
@@ -206,11 +496,10 @@ async function wakeBackend() {
       setStatus('waking', 'server awake, connecting...');
     }
   } catch (err) {
-    console.warn('Initial server ping error (server might still be booting):', err);
+    console.warn('Initial server ping error:', err.message);
   }
 }
 
-// Socket Connection
 function connectSocket() {
   if (!currentRoomId) return;
 
@@ -260,112 +549,108 @@ function connectSocket() {
     }
   });
 
-  socket.on('connect_error', () => {
-    setStatus('reconnecting', 'reconnecting to server...');
+  socket.on('disconnect', () => {
+    setStatus('offline', 'disconnected - reconnecting...');
   });
 
-  socket.on('disconnect', () => {
-    setStatus('reconnecting', 'disconnected, reconnecting...');
+  socket.on('connect_error', () => {
+    setStatus('offline', 'connection error');
   });
 }
 
-// Send Message Handler
+// Send Message Flow
 function handleSendMessage() {
-  if (!currentRoomId || !socket || !socket.connected) {
-    showError('Not connected to the server yet.');
+  if (!currentRoomId) {
+    showError('Please connect to a bird room first.');
     return;
   }
 
-  if (isRateLimited) {
-    return;
-  }
-
-  clearError();
   const text = messageTextInput.value.trim();
-  const from = senderNameInput.value.trim();
+  const from = senderNameInput.value.trim() || undefined;
 
   if (!text) {
     showError('Message cannot be empty.');
     return;
   }
-  if (text.length > 120) {
-    showError('Message exceeds 120 characters.');
+
+  if (isRateLimited) {
+    showError('Please wait before sending another message.');
     return;
   }
 
-  // Save sender name preference
   if (from) {
     safeSetItem('deskbird_sender_name', from);
   }
 
-  // Local optimistic message
-  const localId = `local_${Date.now()}`;
-  const localMsg = {
-    id: localId,
+  clearError();
+
+  const tempId = `temp_${Date.now()}`;
+  const messageData = {
+    id: tempId,
     text,
-    from: from || '',
+    from,
     status: 'sending',
     ts: Date.now()
   };
-  messages.set(localId, localMsg);
+
+  messages.set(tempId, messageData);
   renderMessageLog();
 
   sendButton.disabled = true;
+  messageTextInput.value = '';
+  charCounter.textContent = '0 / 120';
+  charCounter.classList.remove('counter-warning');
 
   socket.emit(EVENTS.MESSAGE_SEND, { text, from }, (res) => {
     sendButton.disabled = false;
 
     if (res && res.ok) {
-      // Replace optimistic message with confirmed id and status
-      messages.delete(localId);
+      messages.delete(tempId);
       messages.set(res.id, {
         id: res.id,
         text,
-        from: from || '',
-        status: res.status || MESSAGE_STATUS.DELIVERED,
-        ts: localMsg.ts
+        from,
+        status: res.status,
+        ts: Date.now()
       });
       renderMessageLog();
-      messageTextInput.value = '';
-      charCounter.textContent = '0 / 120';
-      charCounter.classList.remove('counter-warning');
+
+      // Trigger 2-second rate limit cooldown
+      startRateLimitCooldown(2000);
     } else {
-      messages.delete(localId);
+      messages.delete(tempId);
       renderMessageLog();
 
-      const errCode = res ? res.code : 'server_error';
-      if (errCode === ERROR_CODES.RATE_LIMITED) {
-        const retryAfter = res.retryAfterMs || 2000;
-        triggerRateLimit(retryAfter);
-      } else if (errCode === ERROR_CODES.QUEUE_FULL) {
-        showError('Bird message queue is full (max 20 unread). Please try again later.');
+      if (res && res.code === ERROR_CODES.RATE_LIMITED) {
+        const retryMs = res.retryAfterMs || 2000;
+        showError(`Slow down! You can send another message in a moment.`);
+        startRateLimitCooldown(retryMs);
+      } else if (res && res.code === ERROR_CODES.QUEUE_FULL) {
+        showError('The bird is offline and its queue is full. Try again soon!');
       } else {
-        showError(`Failed to deliver: ${errCode}`);
+        showError(res ? `Error: ${res.code}` : 'Failed to send message.');
       }
     }
   });
 }
 
-function triggerRateLimit(ms) {
+function startRateLimitCooldown(durationMs) {
   isRateLimited = true;
   sendButton.disabled = true;
-  const seconds = Math.ceil(ms / 1000);
-  showError(`Please wait ${seconds}s before sending another note.`);
+  sendButton.classList.add('btn-disabled');
 
   clearTimeout(rateLimitTimer);
   rateLimitTimer = setTimeout(() => {
     isRateLimited = false;
     sendButton.disabled = false;
-    clearError();
-  }, ms);
+    sendButton.classList.remove('btn-disabled');
+  }, durationMs);
 }
 
 // Event Listeners
 function initEventListeners() {
-  // Room change
   changeRoomBtn.addEventListener('click', promptForRoom);
 
-  // Room input submit
   roomInputForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const code = roomCodeInput.value.trim();
@@ -374,7 +659,6 @@ function initEventListeners() {
     }
   });
 
-  // Char counter
   messageTextInput.addEventListener('input', () => {
     const len = messageTextInput.value.length;
     charCounter.textContent = `${len} / 120`;
@@ -385,7 +669,6 @@ function initEventListeners() {
     }
   });
 
-  // Enter sends, Shift+Enter makes newline
   messageTextInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -393,46 +676,34 @@ function initEventListeners() {
     }
   });
 
-  // Form submit
   messageForm.addEventListener('submit', (e) => {
     e.preventDefault();
     handleSendMessage();
   });
 
-  // Hash changes in browser URL
-  window.addEventListener('hashchange', () => {
-    const hash = window.location.hash.replace(/^#\/?/, '').trim();
-    if (!hash) {
-      promptForRoom();
-      return;
-    }
-    const norm = normalizeRoomId(hash);
-    if (isValidRoomId(norm) && norm !== currentRoomId) {
-      setRoom(norm);
-    }
-  });
+  // Feature 1 Listeners (Status & SMS)
+  smsForm.addEventListener('submit', handleSaveSms);
+  smsRemoveBtn.addEventListener('click', handleRemoveSms);
+  smsTestBtn.addEventListener('click', handleTestSms);
+
+  // Feature 2 Listeners (History)
+  historyRefreshBtn.addEventListener('click', loadHistoryView);
+
+  // URL Hash Navigation
+  window.addEventListener('hashchange', handleRoute);
 }
 
 // Initial Bootstrap
 async function init() {
   initEventListeners();
 
-  // Restore saved name
   const savedName = safeGetItem('deskbird_sender_name');
   if (savedName) {
     senderNameInput.value = savedName;
   }
 
-  // Pre-warm backend
   wakeBackend();
-
-  const initialRoom = getInitialRoomId();
-  if (initialRoom) {
-    setRoom(initialRoom);
-  } else {
-    promptForRoom();
-  }
+  handleRoute();
 }
 
 init();
-

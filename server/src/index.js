@@ -12,11 +12,13 @@ import {
   MESSAGE_STATUS,
   deriveRoomId,
   normalizeRoomId,
+  formatRoomId,
   isValidRoomId,
   validateMessage
 } from 'deskbird-shared';
 import { RoomManager } from './rooms.js';
 import { RateLimiter } from './limits.js';
+import { SmsService } from './sms.js';
 
 dotenv.config();
 
@@ -87,6 +89,93 @@ export function createDeskbirdServer(options = {}) {
     });
   });
 
+  const smsService = new SmsService();
+
+  const roomManager = new RoomManager({
+    maxQueue: options.maxQueue ? parseInt(options.maxQueue, 10) : undefined,
+    messageTtlMs: options.messageTtlMs ? parseInt(options.messageTtlMs, 10) : undefined
+  });
+  const rateLimiter = new RateLimiter();
+
+  // API 1: Room status & SMS alert state
+  app.get('/api/rooms/:roomId/status', (req, res) => {
+    const roomId = normalizeRoomId(req.params.roomId);
+    if (!isValidRoomId(roomId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid room code' });
+    }
+    const online = roomManager.isBirdOnline(roomId);
+    const phone = roomManager.getSmsPhone(roomId);
+    return res.json({
+      ok: true,
+      roomId,
+      formattedCode: formatRoomId(roomId),
+      online,
+      smsSubscribed: Boolean(phone),
+      maskedPhone: smsService.maskPhone(phone),
+      smsConfigured: smsService.isConfigured()
+    });
+  });
+
+  // API 2: Subscribe phone number to receive online SMS alert
+  app.post('/api/rooms/:roomId/sms-subscription', (req, res) => {
+    const roomId = normalizeRoomId(req.params.roomId);
+    if (!isValidRoomId(roomId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid room code' });
+    }
+    const phone = req.body && req.body.phone;
+    if (!phone || !smsService.isValidPhone(phone)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Please enter a valid phone number with country code (e.g. +1234567890).'
+      });
+    }
+    roomManager.setSmsPhone(roomId, phone);
+    return res.json({
+      ok: true,
+      subscribed: true,
+      maskedPhone: smsService.maskPhone(phone)
+    });
+  });
+
+  // API 3: Remove phone subscription
+  app.delete('/api/rooms/:roomId/sms-subscription', (req, res) => {
+    const roomId = normalizeRoomId(req.params.roomId);
+    if (!isValidRoomId(roomId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid room code' });
+    }
+    roomManager.setSmsPhone(roomId, null);
+    return res.json({ ok: true, subscribed: false });
+  });
+
+  // API 4: Test SMS trigger
+  app.post('/api/rooms/:roomId/sms-test', async (req, res) => {
+    const roomId = normalizeRoomId(req.params.roomId);
+    if (!isValidRoomId(roomId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid room code' });
+    }
+    const phone = roomManager.getSmsPhone(roomId);
+    if (!phone) {
+      return res.status(400).json({ ok: false, error: 'No phone number saved for this room.' });
+    }
+    const sendRes = await smsService.sendTestSms(phone, formatRoomId(roomId));
+    return res.json(sendRes);
+  });
+
+  // API 5: Full message history for room
+  app.get('/api/rooms/:roomId/history', (req, res) => {
+    const roomId = normalizeRoomId(req.params.roomId);
+    if (!isValidRoomId(roomId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid room code' });
+    }
+    const history = roomManager.getHistory(roomId);
+    return res.json({
+      ok: true,
+      roomId,
+      formattedCode: formatRoomId(roomId),
+      history
+    });
+  });
+
   // Socket.IO configuration
   const io = new Server(httpServer, {
     cors: {
@@ -103,12 +192,6 @@ export function createDeskbirdServer(options = {}) {
     pingTimeout: 25000,
     transports: ['websocket', 'polling']
   });
-
-  const roomManager = new RoomManager({
-    maxQueue: options.maxQueue ? parseInt(options.maxQueue, 10) : undefined,
-    messageTtlMs: options.messageTtlMs ? parseInt(options.messageTtlMs, 10) : undefined
-  });
-  const rateLimiter = new RateLimiter();
 
   io.on('connection', (socket) => {
     const _clientIp = socket.handshake.address;
@@ -128,11 +211,22 @@ export function createDeskbirdServer(options = {}) {
           return ack({ ok: false, code: ERROR_CODES.BAD_SECRET });
         }
 
+        const wasOffline = !roomManager.isBirdOnline(roomId);
         roomManager.setBirdOnline(roomId, socket.id);
         socket.data.birdRoomId = roomId;
 
         // Broadcast online status to any senders in this room
         io.to(`room:${roomId}`).emit(EVENTS.BIRD_STATUS, { online: true });
+
+        // If bird transitioned from offline to online, check for SMS subscriber
+        if (wasOffline) {
+          const smsPhone = roomManager.getSmsPhone(roomId);
+          if (smsPhone) {
+            smsService.sendBirdOnlineAlert(roomId, smsPhone, formatRoomId(roomId)).catch((err) => {
+              console.error('[Deskbird SMS] Error sending online alert:', err.message);
+            });
+          }
+        }
 
         // Deliver any queued messages
         const queued = roomManager.drainQueue(roomId);
@@ -143,6 +237,7 @@ export function createDeskbirdServer(options = {}) {
             from: msg.from,
             ts: msg.ts
           });
+          roomManager.updateHistoryStatus(roomId, msg.id, MESSAGE_STATUS.DELIVERED);
           // Inform senders that the queued message was delivered
           io.to(`room:${roomId}`).emit(EVENTS.MESSAGE_STATUS, {
             id: msg.id,
@@ -169,6 +264,7 @@ export function createDeskbirdServer(options = {}) {
     socket.on(EVENTS.MESSAGE_SEEN, (payload) => {
       const roomId = socket.data.birdRoomId;
       if (!roomId || !payload || !payload.id) return;
+      roomManager.updateHistoryStatus(roomId, payload.id, MESSAGE_STATUS.SEEN);
       io.to(`room:${roomId}`).emit(EVENTS.MESSAGE_STATUS, {
         id: payload.id,
         status: MESSAGE_STATUS.SEEN
@@ -243,6 +339,7 @@ export function createDeskbirdServer(options = {}) {
       if (birdSocketId) {
         // Bird is online: deliver immediately
         io.to(birdSocketId).emit(EVENTS.MESSAGE_NEW, message);
+        roomManager.recordHistory(roomId, message, MESSAGE_STATUS.DELIVERED);
         io.to(`room:${roomId}`).emit(EVENTS.MESSAGE_STATUS, {
           id: msgId,
           status: MESSAGE_STATUS.DELIVERED
@@ -254,6 +351,7 @@ export function createDeskbirdServer(options = {}) {
         if (!enqueueRes.ok) {
           return ack({ ok: false, code: enqueueRes.error });
         }
+        roomManager.recordHistory(roomId, message, MESSAGE_STATUS.QUEUED);
         return ack({ ok: true, id: msgId, status: MESSAGE_STATUS.QUEUED });
       }
     });
@@ -269,7 +367,7 @@ export function createDeskbirdServer(options = {}) {
     });
   });
 
-  return { app, httpServer, io, roomManager };
+  return { app, httpServer, io, roomManager, smsService };
 }
 
 // Direct execution entry point
